@@ -129,7 +129,7 @@ for(i in 1:n.Trader){
                       posit="non",                                      #ポジション
                       )
   
-  #閾値を累計していく
+  #評価額を累計していく
   templim<- templim + temp$eva.price
   
   #リストに保存
@@ -181,7 +181,7 @@ for(i in 1:n.repeat){
     x
   })
   
-  #売買閾値の導出
+  #売買評価額の導出
   n.trade<- min(n.buy,n.sell)
   
   #買値の下限
@@ -205,9 +205,9 @@ for(i in 1:n.repeat){
               paste0("buyer:",n.buy),
               paste0("price:",mkt.price)))
   
-  #閾値から価格
-  price.buy<- eva.price.buy / n.buy       #買い手の閾値の平均
-  price.sell<- eva.price.sell / n.sell    #売り手の閾値の平均
+  #評価額から価格
+  price.buy<- eva.price.buy / n.buy       #買い手の評価額の平均
+  price.sell<- eva.price.sell / n.sell    #売り手の評価額の平均
   price.gap<- price.buy - price.sell  #双方の価格差
   
   #買い手の数が多い場合
