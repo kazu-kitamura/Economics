@@ -1,7 +1,6 @@
 gc();gc(reset=TRUE)
 print("gc done")
 rm(list=ls(all.names=TRUE))
-memory.limit(size = 400000)
 
 # 乱数シードの固定
 set.seed(55)
