@@ -388,20 +388,20 @@ mtext("share",
 #次のエリアに
 par(new=F)
 
-#財保有量のヒストグラム
+#財保有量のヒストグラム##############################################
 hist(distmat$goods,
      main="Histgram of Goods")
 
 #次のエリアに
 par(new=F)
 
-#貨幣保有量のヒストグラム
+#貨幣保有量のヒストグラム#############################################
 hist(distmat$money,
      main="Histgram of Money")
 
 #次のエリアに
 par(new=F)
 
-#総資産のヒストグラム
+#総資産のヒストグラム#################################################
 hist(distmat$total,
      main="Histgram of Total")
