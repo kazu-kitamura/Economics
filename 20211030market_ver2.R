@@ -1,47 +1,68 @@
+#####################################################################
+# æº–å‚™
+
 gc();gc(reset=TRUE)
 print("gc done")
 rm(list=ls(all.names=TRUE))
 
-# —”ƒV[ƒh‚ÌŒÅ’è
+# ä¹±æ•°ã‚·ãƒ¼ãƒ‰ã®å›ºå®š
 set.seed(555)
 
-# ƒpƒbƒP[ƒW‚Ì“Ç‚İ‚İ
+# ãƒ‘ãƒƒã‚±ãƒ¼ã‚¸ã®èª­ã¿è¾¼ã¿
 library(R6)
 library(dplyr)
 
-#ƒCƒ“ƒXƒ^ƒ“ƒX‚ğ•Û‘¶‚·‚éƒŠƒXƒg
-Trader_list<- list()
+#####################################################################
+# ãƒãƒ¼ã‚±ãƒƒãƒˆã¨ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ã®è¨­å®š
+# ãƒ»ã€€n.Traderäººã®å–å¼•ä¸»ä½“ãŒn.repeatå›æ•°ã®å–å¼•ã‚’è¡Œã†å¸‚å ´
+# ãƒ»ã€€è²¡ã¯goodsã®ã¿
+# ãƒ»ã€€å„å–å¼•ä¸»ä½“ã¯ã€å€‹ã€…ã«ç•°ãªã‚‹è²¡ã¸ã®è©•ä¾¡é¡ã€è²¡åŠã³è²¨å¹£ã®ä¿æœ‰é‡ã€å¸‚å ´ä¾¡æ ¼ã¨
+#ã€€ã€€è©•ä¾¡é¡ã®ä¹–é›¢ã‹ã‚‰è©•ä¾¡é¡ã‚’æ”¹å®šã™ã‚‹å­¦ç¿’ç‡ã‚’æŒã¤
 
-#ƒ}[ƒPƒbƒg‚Ìİ’è
-n.Trader<- 1000   #ƒvƒŒƒCƒ„[”
-adjSpeed<- 0.3     #‰¿Ši’²®‚ÌƒXƒs[ƒh
-n.repeat<- 30     #æˆø‰ñ”
+#ãƒãƒ¼ã‚±ãƒƒãƒˆã®è¨­å®š
+n.Trader<- 1000   #ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼æ•°
+adjSpeed<- 0.3     #ä¾¡æ ¼èª¿æ•´ã®ã‚¹ãƒ”ãƒ¼ãƒ‰
+n.repeat<- 30     #å–å¼•å›æ•°
 
-#ƒvƒŒƒCƒ„[‚Ìİ’è
-max.eva.price<- 13     #•]‰¿Šz‚ÌãŒÀ
-min.eva.price<- 7      #•]‰¿Šz‚Ì‰ºŒÀ
-max.money<- 150    #‰İ•¼•Û—L—Ê‚ÌãŒÀ
-min.money<- 50     #‰İ•¼•Û—L—Ê‚Ì‰ºŒÀ
-min.lrate<- 0      #ŠwK—¦‚Ì‰ºŒÀ
-max.lrate<- 0.1    #ŠwK—¦‚ÌãŒÀ
+#ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ã®è¨­å®š
+max.eva.price<- 13     #è©•ä¾¡é¡ã®ä¸Šé™
+min.eva.price<- 7      #è©•ä¾¡é¡ã®ä¸‹é™
+max.money<- 150    #è²¨å¹£ä¿æœ‰é‡ã®ä¸Šé™
+min.money<- 50     #è²¨å¹£ä¿æœ‰é‡ã®ä¸‹é™
+min.lrate<- 0      #å­¦ç¿’ç‡ã®ä¸‹é™
+max.lrate<- 0.1    #å­¦ç¿’ç‡ã®ä¸Šé™
 max.goods<- round(max.money /
                     ((max.eva.price +
-                        min.eva.price)/2))    #à•Û—L—Ê‚ÌãŒÀ
+                        min.eva.price)/2))    #è²¡ä¿æœ‰é‡ã®ä¸Šé™
 min.goods<- round(min.money /
                     ((max.eva.price +
-                        min.eva.price)/2))    #à•Û—L—Ê‚Ì‰ºŒÀ
+                        min.eva.price)/2))    #è²¡ä¿æœ‰é‡ã®ä¸‹é™
 
-#ƒgƒŒ[ƒ_[ƒNƒ‰ƒX‚Ì’è‹`
+####################################################################
+# å–å¼•ä¸»ä½“ã®ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã®å®šç¾©
+# ãƒ»ã€€å„å–å¼•ä¸»ä½“ã¯ã€å¸‚å ´ä¾¡æ ¼ã‚ˆã‚Šè‡ªèº«ã®è©•ä¾¡é¡ãŒé«˜ãå–å¼•ã«å¿…è¦ãªè²¨å¹£ã‚’ä¿æœ‰ã—
+#ã€€ã€€ã¦ã„ã‚Œã°è²·ã„ã€è©•ä¾¡é¡ãŒä½ãå–å¼•ã«å¿…è¦ãªè²¡ã‚’ä¿æœ‰ã—ã¦ã„ã‚Œã°å£²ã‚Šã®ãƒã‚¸ã‚·ãƒ§
+#ã€€ã€€ãƒ³ã‚’ã¨ã‚‹
+# ãƒ»ã€€å£²è²·ã®æ•°ã‚’æ¯”è¼ƒã—ã€è²·ã„æ‰‹ãŒå¤šã‘ã‚Œã°å£²ã‚Šæ‰‹ã®æ•°ã¾ã§ã€å£²ã‚Šæ‰‹ãŒå¤šã‘ã‚Œã°è²·
+#ã€€ã€€ã„æ‰‹ã®æ•°ã¾ã§å–å¼•ãŒæˆç«‹ã™ã‚‹ã‚‚ã®ã¨ã—ã€è²·ã„æ‰‹ãƒ»å£²ã‚Šæ‰‹ã¨ã‚‚è²¡ä¸€å˜ä½ã‚’å¸‚å ´
+#ã€€ã€€ä¾¡æ ¼ã§å£²è²·ã™ã‚‹
+# ãƒ»ã€€å£²è²·ã®æˆå¦ã«ã‹ã‹ã‚ã‚‰ãšã€ã™ã¹ã¦ã®å–å¼•ä¸»ä½“ã¯å¸‚å ´ä¾¡æ ¼ã¨è‡ªèº«ã®è©•ä¾¡é¡ã¨ã®
+#ã€€ã€€ä¹–é›¢ã‚’è¸ã¾ãˆã€å„ã€…ã®å­¦ç¿’ç‡ã§è‡ªèº«ã®è©•ä¾¡é¡ã‚’æ”¹å®šã™ã‚‹
+
+#ã‚¤ãƒ³ã‚¹ã‚¿ãƒ³ã‚¹ã‚’ä¿å­˜ã™ã‚‹ãƒªã‚¹ãƒˆ
+Trader_list<- list()
+
+#ãƒˆãƒ¬ãƒ¼ãƒ€ãƒ¼ã‚¯ãƒ©ã‚¹ã®å®šç¾©
 Trader<- R6Class("Trader",
                    public=list(
-                     name="T00",@@     #–¼‘O
-                     eva.price=0,        #”„”ƒ•]‰¿Šz
-                     goods=0,            #à‚Ì•Û—L—Ê
-                     money=0,            #‰İ•¼‚Ì•Û—L—Ê
-                     lrate=0.01,         #‰¿Ši·’²®‚ÌŠwK—¦
-                     posit=NULL,         #ƒ|ƒWƒVƒ‡ƒ“
+                     name="T00",ã€€ã€€     #åå‰
+                     eva.price=0,        #å£²è²·è©•ä¾¡é¡
+                     goods=0,            #è²¡ã®ä¿æœ‰é‡
+                     money=0,            #è²¨å¹£ã®ä¿æœ‰é‡
+                     lrate=0.01,         #ä¾¡æ ¼å·®èª¿æ•´ã®å­¦ç¿’ç‡
+                     posit=NULL,         #ãƒã‚¸ã‚·ãƒ§ãƒ³
 
-                     #‰Šú‰»
+                     #åˆæœŸåŒ–###########################################
                      initialize=function(name,
                                          eva.price,
                                          goods,
@@ -57,7 +78,7 @@ Trader<- R6Class("Trader",
                        self$posit=posit
                      },
                      
-                     #•\¦ƒƒ\ƒbƒh
+                     #ãƒ¡ã‚½ãƒƒãƒ‰ï¼šè¡¨ç¤º#######################################
                      view2=function(){
                        print(paste(self$name,
                                    paste0("goods:",self$goods),
@@ -66,136 +87,138 @@ Trader<- R6Class("Trader",
                                    paste0("learning rate:",self$lrate)))
                      },
                      
-                     #‰¿Ši‚Æ•Û—L—Ê‚ğ•Ï”‚Æ‚µ‚½”„‚è”ƒ‚¢”»’f
+                     #ãƒ¡ã‚½ãƒƒãƒ‰ï¼šä¾¡æ ¼ã¨ä¿æœ‰é‡ã«åŸºã¥ãå£²è²·åˆ¤æ–­##################
                      decide=function(mkt.price){
                        
-                       #sê‰¿Ši‚ª‚‚­•K—v‚Èà‚ğ•Û—L‚µ‚Ä‚¢‚½‚ç”„‚è
+                       #å¸‚å ´ä¾¡æ ¼ãŒé«˜ãå¿…è¦ãªè²¡ã‚’ä¿æœ‰ã—ã¦ã„ãŸã‚‰å£²ã‚Š
                        if(mkt.price > self$eva.price &
                           self$goods > 0){
                          self$posit="sell"
                        
-                       #sê‰¿Ši‚ªˆÀ‚­•K—v‚È‰İ•¼‚ğ•Û—L‚µ‚Ä‚¢‚½‚ç”ƒ‚¢
+                       #å¸‚å ´ä¾¡æ ¼ãŒå®‰ãå¿…è¦ãªè²¨å¹£ã‚’ä¿æœ‰ã—ã¦ã„ãŸã‚‰è²·ã„
                        }else if(mkt.price < self$eva.price &
                                 self$money > mkt.price){
                          self$posit="buy"
                          
-                       #‚»‚Ì‘¼‚Í’†—§
+                       #ãã®ä»–ã¯ä¸­ç«‹
                        }else{
                          self$posit="non"
                        }
                      },
                      
-                     #”„”ƒ‚ÌÀs
+                     #ãƒ¡ã‚½ãƒƒãƒ‰ï¼šå£²è²·ã®å®Ÿè¡Œ####################################
                      trade=function(mkt.price,
                                     buy.price.limit,
                                     sell.price.limit){
                        
-                       #ƒ|ƒWƒVƒ‡ƒ“‚ª”ƒ‚¢‚Å§ŒÀ’l‚æ‚è‚‚¢•]‰¿‚Ìê‡
+                       #ãƒã‚¸ã‚·ãƒ§ãƒ³ãŒè²·ã„ã§åˆ¶é™å€¤ã‚ˆã‚Šé«˜ã„è©•ä¾¡ã®å ´åˆã€è²¨å¹£ä¿æœ‰é‡ã‹ã‚‰
+                       #å¸‚å ´ä¾¡æ ¼ã‚’å·®ã—å¼•ãã€è²¡ä¿æœ‰é‡ã‚’ä¸€å˜ä½è¿½åŠ ã™ã‚‹
                        if(self$posit == "buy" &
-                          self$eva.price > buy.price.limit){
+                          self$eva.price > buy.price.limit){                         
                          self$money= self$money - mkt.price
                          self$goods= self$goods + 1
                          
-                       #ƒ|ƒWƒVƒ‡ƒ“‚ª”„‚è‚Å§ŒÀ’l‚æ‚è’á‚¢•]‰¿‚Ìê‡
+                       #ãƒã‚¸ã‚·ãƒ§ãƒ³ãŒå£²ã‚Šã§åˆ¶é™å€¤ã‚ˆã‚Šä½ã„è©•ä¾¡ã®å ´åˆã€è²¨å¹£ä¿æœ‰é‡ã«
+                       #å¸‚å ´ä¾¡æ ¼ã‚’è¶³ã—ã€è²¡ä¿æœ‰é‡ã‚’ä¸€å˜ä½å·®ã—å¼•ã
                        }else if(self$posit == "sell" &
                                 self$eva.price < sell.price.limit){
                          self$money= self$money + mkt.price
                          self$goods= self$goods - 1
                        }
                        
-                       #•\¦
+                       #çµæœã®è¡¨ç¤º
                        print(paste(self$name,
                                    self$posit,
                                    paste0("goods:",self$goods),
                                    paste0("money:",self$money),
                                    paste0("eva.price:",self$eva.price)))
                        
-                       #‰¿Ši·‚ÆŠwK—¦‚É‚æ‚é•]‰¿Šz‚ÌXV
+                       #å¸‚å ´ä¾¡æ ¼ã¨è©•ä¾¡é¡ã®å·®ã«å­¦ç¿’ç‡ã‚’ä¹—ã˜ã¦è©•ä¾¡é¡ã‚’æ›´æ–°
                        self$eva.price<- self$eva.price + 
                          (mkt.price - self$eva.price) * self$lrate
                      }
                   )
 )
 
-#•]‰¿ŠzWŒv‚Ì‚½‚ß‚Ì“ü‚ê•¨
+#è©•ä¾¡é¡é›†è¨ˆã®ãŸã‚ã®å…¥ã‚Œç‰©
 templim<- 0        
 
-#‰ŠúƒCƒ“ƒXƒ^ƒ“ƒX‚Ìì¬
+#åˆæœŸã‚¤ãƒ³ã‚¹ã‚¿ãƒ³ã‚¹ã®ä½œæˆ
 for(i in 1:n.Trader){
   
-  #ƒCƒ“ƒXƒ^ƒ“ƒX‚ğì¬‚µ‚ÄƒŠƒXƒg‚ÉƒXƒgƒbƒN
-  temp<- Trader$new(name=paste0("T",formatC(i,digits=4,flag=0)),       #–¼‘O
-                      eva.price=runif(1,min.eva.price,max.eva.price),  #•]‰¿Šz
-                      goods=round(runif(1,min.goods,max.goods)),       #à•Û—L—Ê
-                      money=round(runif(1,min.money,max.money)),       #‰İ•¼•Û—L—Ê
-                      lrate=runif(1,min.lrate,max.lrate),              #ŠwK—¦
-                      posit="non",                                      #ƒ|ƒWƒVƒ‡ƒ“
+  #ã‚¤ãƒ³ã‚¹ã‚¿ãƒ³ã‚¹ã‚’ä½œæˆã—ã¦ãƒªã‚¹ãƒˆã«ã‚¹ãƒˆãƒƒã‚¯
+  temp<- Trader$new(name=paste0("T",formatC(i,digits=4,flag=0)),       #åå‰
+                      eva.price=runif(1,min.eva.price,max.eva.price),  #è©•ä¾¡é¡
+                      goods=round(runif(1,min.goods,max.goods)),       #è²¡ä¿æœ‰é‡
+                      money=round(runif(1,min.money,max.money)),       #è²¨å¹£ä¿æœ‰é‡
+                      lrate=runif(1,min.lrate,max.lrate),              #å­¦ç¿’ç‡
+                      posit="non",                                      #ãƒã‚¸ã‚·ãƒ§ãƒ³
                       )
   
-  #è‡’l‚ğ—İŒv‚µ‚Ä‚¢‚­
+  #é–¾å€¤ã‚’ç´¯è¨ˆã—ã¦ã„ã
   templim<- templim + temp$eva.price
   
-  #ƒŠƒXƒg‚É•Û‘¶
+  #ãƒªã‚¹ãƒˆã«ä¿å­˜
   Trader_list[[i]]<- temp
   
-  #•\¦ƒƒ\ƒbƒh‚Å•\¦
+  #è¡¨ç¤ºãƒ¡ã‚½ãƒƒãƒ‰ã§è¡¨ç¤º
   temp$view2()
 }
 
-#‰¿Ši‚Ì‰Šú’l‚Í•]‰¿Šz‚Ì•½‹Ï
+#ä¾¡æ ¼ã®åˆæœŸå€¤ã¯è©•ä¾¡é¡ã®å¹³å‡
 mkt.price<- templim / length(Trader_list)
 
-#Œ‹‰ÊŠi”[‚Ì‚½‚ß‚Ìƒf[ƒ^ƒtƒŒ[ƒ€
+#çµæœæ ¼ç´ã®ãŸã‚ã®ãƒ‡ãƒ¼ã‚¿ãƒ•ãƒ¬ãƒ¼ãƒ 
 resmat<- matrix(0,nrow=n.repeat,ncol=5) %>% as.data.frame()
 colnames(resmat)<- c("n.buy","n.sell","price.buy","price.sell","price")
 
-#æˆøƒ‹[ƒv
+#å–å¼•ãƒ«ãƒ¼ãƒ—
 for(i in 1:n.repeat){
   
-  #”ƒ‚¢è‚Æ”„‚èè‚Ì”‚ğ“ü‚ê‚é•Ï”
+  #è²·ã„æ‰‹ã¨å£²ã‚Šæ‰‹ã®æ•°ã‚’å…¥ã‚Œã‚‹å¤‰æ•°
   n.buy<- 0
   n.sell<- 0
   
-  #”ƒ‚¢è‚Æ”„‚èè‚Ì•]‰¿Šz‚Ì—İŒv‚ğ“ü‚ê‚é•Ï”
+  #è²·ã„æ‰‹ã¨å£²ã‚Šæ‰‹ã®è©•ä¾¡é¡ã®ç´¯è¨ˆã‚’å…¥ã‚Œã‚‹å¤‰æ•°
   eva.price.buy<- 0
   eva.price.sell<- 0
   
-  #”„”ƒ‚Ì•]‰¿Šz‚ğ‚½‚ß‚Ä‚¢‚­ƒxƒNƒgƒ‹
+  #å£²è²·ã®è©•ä¾¡é¡ã‚’ãŸã‚ã¦ã„ããƒ™ã‚¯ãƒˆãƒ«
   buy.price.vec<- vector()
   sell.price.vec<- vector()
   
-  #”„”ƒ”»’f
+  #å£²è²·åˆ¤æ–­
   Trader_list<- lapply(Trader_list,function(x){
     x$decide(mkt.price)
     
-    #”ƒ‚¢‚Ìê‡
+    #è²·ã„ã®å ´åˆ
     if(x$posit=="buy"){
-      n.buy<<- n.buy + 1                              #”ƒ‚¢è‚Ì”‚ğ—İŒv
-      eva.price.buy<<- eva.price.buy + x$eva.price    #”ƒ‚¢è‚Ì•]‰¿Šz‚ğ—İŒv
-      buy.price.vec<<- c(buy.price.vec,x$eva.price)   #•]‰¿ŠzƒxƒNƒgƒ‹
+      n.buy<<- n.buy + 1                              #è²·ã„æ‰‹ã®æ•°ã‚’ç´¯è¨ˆ
+      eva.price.buy<<- eva.price.buy + x$eva.price    #è²·ã„æ‰‹ã®è©•ä¾¡é¡ã‚’ç´¯è¨ˆ
+      buy.price.vec<<- c(buy.price.vec,x$eva.price)   #è©•ä¾¡é¡ãƒ™ã‚¯ãƒˆãƒ«
       
-      #”„‚è‚Ìê‡
+      #å£²ã‚Šã®å ´åˆ
     }else if(x$posit=="sell"){
-      n.sell<<- n.sell + 1                             #”„‚èè‚Ì”‚ğ—İŒv
-      eva.price.sell<<- eva.price.sell + x$eva.price   #”„‚èè‚Ì•]‰¿Šz‚ğ—İŒv
-      sell.price.vec<<- c(sell.price.vec,x$eva.price)  #•]‰¿ŠzƒxƒNƒgƒ‹
+      n.sell<<- n.sell + 1                             #å£²ã‚Šæ‰‹ã®æ•°ã‚’ç´¯è¨ˆ
+      eva.price.sell<<- eva.price.sell + x$eva.price   #å£²ã‚Šæ‰‹ã®è©•ä¾¡é¡ã‚’ç´¯è¨ˆ
+      sell.price.vec<<- c(sell.price.vec,x$eva.price)  #è©•ä¾¡é¡ãƒ™ã‚¯ãƒˆãƒ«
     }
-    #ƒƒ\ƒbƒh“K—pŒã‚ÌƒCƒ“ƒXƒ^ƒ“ƒX‚ğ•Ô‚·
+    #ãƒ¡ã‚½ãƒƒãƒ‰é©ç”¨å¾Œã®ã‚¤ãƒ³ã‚¹ã‚¿ãƒ³ã‚¹ã‚’è¿”ã™
     x
   })
   
-  #”„”ƒ‰Â”\Œ”‚Ì“±o
+  #å£²è²·å¯èƒ½ä»¶æ•°ã®å°å‡º
   n.trade<- min(n.buy,n.sell)
   
-  #”ƒ’l‚Ì‰ºŒÀ
+  #è²·å€¤ã®ä¸‹é™
   buy.price.limit<- sort(buy.price.vec,
                          decreasing=T)[n.trade]
   
-  #”„’l‚Ì‰ºŒÀ
+  #å£²å€¤ã®ä¸‹é™
   sell.price.limit<- sort(sell.price.vec,
                           decreasing=F)[n.trade]
   
-  #æˆø‚ÌÀs
+  #å–å¼•ã®å®Ÿè¡Œ
   Trader_list<- lapply(Trader_list,function(x){
     x$trade(mkt.price,
             buy.price.limit,
@@ -203,65 +226,65 @@ for(i in 1:n.repeat){
     x
   })
   
-  #æˆø1‰ñ•ª‚ÌŒ‹‰Ê‚ğ•\¦
+  #å–å¼•1å›åˆ†ã®çµæœã‚’è¡¨ç¤º
   print(paste(paste0("seller:",n.sell),
               paste0("buyer:",n.buy),
               paste0("price:",mkt.price)))
   
-  #•]‰¿Šz‚©‚ç‰¿Ši
-  price.buy<- eva.price.buy / n.buy       #”ƒ‚¢è‚Ì•]‰¿Šz‚Ì•½‹Ï
-  price.sell<- eva.price.sell / n.sell    #”„‚èè‚Ì•]‰¿Šz‚Ì•½‹Ï
-  price.gap<- price.buy - price.sell  #‘o•û‚Ì‰¿Ši·
+  #è©•ä¾¡é¡ã‹ã‚‰ä¾¡æ ¼
+  price.buy<- eva.price.buy / n.buy       #è²·ã„æ‰‹ã®è©•ä¾¡é¡ã®å¹³å‡
+  price.sell<- eva.price.sell / n.sell    #å£²ã‚Šæ‰‹ã®è©•ä¾¡é¡ã®å¹³å‡
+  price.gap<- price.buy - price.sell  #åŒæ–¹ã®ä¾¡æ ¼å·®
   
-  #”ƒ‚¢è‚Ì”‚ª‘½‚¢ê‡
+  #è²·ã„æ‰‹ã®æ•°ãŒå¤šã„å ´åˆ
   if(n.buy > n.sell){
-    mkt.price<- mkt.price + price.gap * adjSpeed   #‰¿Ši·‚É’²®ƒXƒs[ƒh‚ğŠ|‚¯‚Ä‘«‚·
+    mkt.price<- mkt.price + price.gap * adjSpeed   #ä¾¡æ ¼å·®ã«èª¿æ•´ã‚¹ãƒ”ãƒ¼ãƒ‰ã‚’æ›ã‘ã¦è¶³ã™
     
-  #”„‚èè‚Ì”‚ª‘½‚¢ê‡
+  #å£²ã‚Šæ‰‹ã®æ•°ãŒå¤šã„å ´åˆ
   }else if(n.buy < n.sell){
-    mkt.price<- mkt.price - price.gap * adjSpeed   #‰¿Ši·‚É’²®ƒXƒs[ƒh‚ğŠ|‚¯‚Äˆø‚­
+    mkt.price<- mkt.price - price.gap * adjSpeed   #ä¾¡æ ¼å·®ã«èª¿æ•´ã‚¹ãƒ”ãƒ¼ãƒ‰ã‚’æ›ã‘ã¦å¼•ã
   
-  #ƒC[ƒuƒ“‚Ìê‡
+  #ã‚¤ãƒ¼ãƒ–ãƒ³ã®å ´åˆ
   }else{
     mkt.price<- mkt.price
   }
   
-  #Œ‹‰Ê•Û‘¶
+  #çµæœä¿å­˜
   resmat[i,]<- c(n.buy,n.sell,price.buy,price.sell,mkt.price)
 }
 
-#à‚Æ‘Y‚Ì•ª•z‚ğ’Šo
-distmat<- matrix(0,ncol=4,nrow=n.Trader) %>% as.data.frame()   #“ü‚ê•¨
+#è²¡ã¨è³‡ç”£ã®åˆ†å¸ƒã‚’æŠ½å‡º
+distmat<- matrix(0,ncol=4,nrow=n.Trader) %>% as.data.frame()   #å…¥ã‚Œç‰©
 colnames(distmat)<- c("name","goods","money","total")
 
-for(i in 1:n.Trader){                      #Šes‚É“ü‚ê‚Ä‚¢‚­
+for(i in 1:n.Trader){                      #å„è¡Œã«å…¥ã‚Œã¦ã„ã
   distmat[i,1]<- Trader_list[[i]]$name
   distmat[i,2]<- Trader_list[[i]]$goods
   distmat[i,3]<- Trader_list[[i]]$money
   distmat[i,4]<- (distmat[i,2] * mkt.price) + distmat[i,3]
 }
 
-#ƒŒƒCƒAƒEƒgw’è
+#ãƒ¬ã‚¤ã‚¢ã‚¦ãƒˆæŒ‡å®š
 layout(1)
 
 laymat<- matrix(c(1,1,1,2,3,4),2,3,byrow=T)
 layout(laymat,
        heights=c(3,2))
 
-#ƒOƒ‰ƒt•\¦‚Ì‚½‚ß‚É‰¿Ši‚Ìã‰º‚ğ’Šo
-price.max<- max(resmat$price.buy)    #Å‘å’l‚Í”ƒ’l‚©‚ç
-price.min<- min(resmat$price.sell)   #Å¬’l‚Í”„’l‚©‚ç
+#ã‚°ãƒ©ãƒ•è¡¨ç¤ºã®ãŸã‚ã«ä¾¡æ ¼ã®ä¸Šä¸‹ã‚’æŠ½å‡º
+price.max<- max(resmat$price.buy)    #æœ€å¤§å€¤ã¯è²·å€¤ã‹ã‚‰
+price.min<- min(resmat$price.sell)   #æœ€å°å€¤ã¯å£²å€¤ã‹ã‚‰
 
-#ƒOƒ‰ƒtƒf[ƒ^
+#ã‚°ãƒ©ãƒ•ãƒ‡ãƒ¼ã‚¿
 price_buy<- resmat$price.buy
 price_sell<- resmat$price.sell
 price_trade<- resmat$price
 share_of_buy<- resmat$n.buy / n.Trader
 
-#ƒOƒ‰ƒtƒGƒŠƒA‚ğXV
+#ã‚°ãƒ©ãƒ•ã‚¨ãƒªã‚¢ã‚’æ›´æ–°
 par(new=F)
 
-#‰¿Ši‚Ì„ˆÚ‚ğƒOƒ‰ƒt‰»
+#ä¾¡æ ¼ã®æ¨ç§»ã‚’ã‚°ãƒ©ãƒ•åŒ–
 plot(price_trade,
      type="l",
      axes=TRUE,
@@ -270,10 +293,10 @@ plot(price_trade,
      ylim=c(price.min,price.max),
      col="black")
 
-#d‚Ë‚Ä•`‚­
+#é‡ã­ã¦æã
 par(new=T)
 
-#”ƒ’l‚Ì„ˆÚ‚ğƒOƒ‰ƒt‰»
+#è²·å€¤ã®æ¨ç§»ã‚’ã‚°ãƒ©ãƒ•åŒ–
 plot(price_buy,
      type="l",
      axes=TRUE,
@@ -282,10 +305,10 @@ plot(price_buy,
      ylim=c(price.min,price.max),
      col="red")
 
-#d‚Ë‚Ä•`‚­
+#é‡ã­ã¦æã
 par(new=T)
 
-#”„’l‚Ì„ˆÚ‚ğƒOƒ‰ƒt‰»
+#å£²å€¤ã®æ¨ç§»ã‚’ã‚°ãƒ©ãƒ•åŒ–
 plot(price_sell,
      type="l",
      axes=TRUE,
@@ -294,10 +317,10 @@ plot(price_sell,
      ylim=c(price.min,price.max),
      col="blue")
 
-#d‚Ë‚Ä•`‚­
+#é‡ã­ã¦æã
 par(new=T)
 
-#”ƒ‚¢è‚ÌŠ„‡‚Ì„ˆÚ‚ğƒOƒ‰ƒt‰»i‘æ“ñ²j
+#è²·ã„æ‰‹ã®å‰²åˆã®æ¨ç§»ã‚’ã‚°ãƒ©ãƒ•åŒ–ï¼ˆç¬¬äºŒè»¸ï¼‰
 plot(share_of_buy,
      type="l",
      axes=FALSE,
@@ -322,20 +345,20 @@ mtext("price",
       side=4,
       line=2)
 
-#Ÿ‚ÌƒGƒŠƒA‚É
+#æ¬¡ã®ã‚¨ãƒªã‚¢ã«
 par(new=F)
 
-#à‚ÌƒqƒXƒgƒOƒ‰ƒ€
+#è²¡ã®ãƒ’ã‚¹ãƒˆã‚°ãƒ©ãƒ 
 hist(distmat$goods,
      main="Histgram of Goods")
 
-#Ÿ‚ÌƒGƒŠƒA‚É
+#æ¬¡ã®ã‚¨ãƒªã‚¢ã«
 par(new=F)
 
-#‰İ•¼‚ÌƒqƒXƒgƒOƒ‰ƒ€
+#è²¨å¹£ã®ãƒ’ã‚¹ãƒˆã‚°ãƒ©ãƒ 
 hist(distmat$money,
      main="Histgram of Money")
 
-#‘‘Y‚ÌƒqƒXƒgƒOƒ‰ƒ€
+#ç·è³‡ç”£ã®ãƒ’ã‚¹ãƒˆã‚°ãƒ©ãƒ 
 hist(distmat$total,
      main="Histgram of Total")
