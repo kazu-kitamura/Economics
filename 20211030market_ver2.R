@@ -3,7 +3,7 @@ print("gc done")
 rm(list=ls(all.names=TRUE))
 
 # 乱数シードの固定
-set.seed(55)
+set.seed(555)
 
 # パッケージの読み込み
 library(R6)
@@ -20,12 +20,16 @@ n.repeat<- 30     #取引回数
 #プレイヤーの設定
 max.eva.price<- 13     #評価額の上限
 min.eva.price<- 7      #評価額の下限
-max.goods<- 150    #財保有量の上限
-min.goods<- 50     #財保有量の下限
 max.money<- 150    #貨幣保有量の上限
 min.money<- 50     #貨幣保有量の下限
 min.lrate<- 0      #学習率の下限
 max.lrate<- 0.1    #学習率の上限
+max.goods<- round(max.money /
+                    ((max.eva.price +
+                        min.eva.price)/2))    #財保有量の上限
+min.goods<- round(min.money /
+                    ((max.eva.price +
+                        min.eva.price)/2))    #財保有量の下限
 
 #トレーダークラスの定義
 Trader<- R6Class("Trader",
@@ -67,12 +71,12 @@ Trader<- R6Class("Trader",
                        
                        #市場価格が高く必要な財を保有していたら売り
                        if(mkt.price > self$eva.price &
-                          mkt.price < self$goods){
+                          self$goods > 0){
                          self$posit="sell"
                        
                        #市場価格が安く必要な貨幣を保有していたら買い
                        }else if(mkt.price < self$eva.price &
-                                mkt.price < self$money){
+                                self$money > mkt.price){
                          self$posit="buy"
                          
                        #その他は中立
@@ -90,13 +94,13 @@ Trader<- R6Class("Trader",
                        if(self$posit == "buy" &
                           self$eva.price > buy.price.limit){
                          self$money= self$money - mkt.price
-                         self$goods= self$goods + mkt.price
+                         self$goods= self$goods + 1
                          
                        #ポジションが売りで制限値より低い評価の場合
                        }else if(self$posit == "sell" &
                                 self$eva.price < sell.price.limit){
                          self$money= self$money + mkt.price
-                         self$goods= self$goods - mkt.price
+                         self$goods= self$goods - 1
                        }
                        
                        #表示
@@ -180,7 +184,7 @@ for(i in 1:n.repeat){
     x
   })
   
-  #売買評価額の導出
+  #売買可能件数の導出
   n.trade<- min(n.buy,n.sell)
   
   #買値の下限
@@ -234,7 +238,7 @@ for(i in 1:n.Trader){                      #各行に入れていく
   distmat[i,1]<- Trader_list[[i]]$name
   distmat[i,2]<- Trader_list[[i]]$goods
   distmat[i,3]<- Trader_list[[i]]$money
-  distmat[i,4]<- distmat[i,2] + distmat[i,3]
+  distmat[i,4]<- (distmat[i,2] * mkt.price) + distmat[i,3]
 }
 
 #レイアウト指定
