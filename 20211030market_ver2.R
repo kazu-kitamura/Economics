@@ -140,6 +140,14 @@ Trader<- R6Class("Trader",
                   )
 )
 
+#####################################################################
+# 取引主体のオブジェクトの生成
+# ・　あらかじめ設定した評価額、財及び貨幣の保有量、学習率の最大値・最小値の範囲で
+#　　一様乱数で個々に異なる取引主体のオブジェクトを、あらかじめ定義したトレーダー
+#　　クラスのインスタンスとしてあらかじめ設定した取引主体数分作成し、一つのリスト
+#　　に保管する
+# ・　作成と合わせて各評価額を累計していき、その平均を市場価格の初期値とする
+
 #評価額集計のための入れ物
 templim<- 0        
 
@@ -152,10 +160,10 @@ for(i in 1:n.Trader){
                       goods=round(runif(1,min.goods,max.goods)),       #財保有量
                       money=round(runif(1,min.money,max.money)),       #貨幣保有量
                       lrate=runif(1,min.lrate,max.lrate),              #学習率
-                      posit="non",                                      #ポジション
+                      posit="non",                                     #ポジション
                       )
   
-  #閾値を累計していく
+  #評価額を累計していく
   templim<- templim + temp$eva.price
   
   #リストに保存
@@ -165,7 +173,7 @@ for(i in 1:n.Trader){
   temp$view2()
 }
 
-#価格の初期値は評価額の平均
+#市場価格の初期値は評価額の平均
 mkt.price<- templim / length(Trader_list)
 
 #結果格納のためのデータフレーム
