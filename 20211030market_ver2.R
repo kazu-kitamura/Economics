@@ -125,12 +125,12 @@ Trader<- R6Class("Trader",
                          self$goods= self$goods - 1
                        }
                        
-                       #結果の表示
-                       print(paste(self$name,
-                                   self$posit,
-                                   paste0("goods:",self$goods),
-                                   paste0("money:",self$money),
-                                   paste0("eva.price:",self$eva.price)))
+#                       #結果の表示
+#                       print(paste(self$name,
+#                                   self$posit,
+#                                   paste0("goods:",self$goods),
+#                                   paste0("money:",self$money),
+#                                   paste0("eva.price:",self$eva.price)))
                        
                        #市場価格と評価額の差に学習率を乗じて評価額を更新
                        self$eva.price<- self$eva.price + 
@@ -255,7 +255,7 @@ for(i in 1:n.repeat){
   #評価額から価格
   price.buy<- eva.price.buy / n.buy       #買い手の評価額の平均
   price.sell<- eva.price.sell / n.sell    #売り手の評価額の平均
-  price.gap<- price.buy - price.sell  #双方の価格差
+  price.gap<- price.buy - price.sell      #双方の価格差
   
   #買い手の数が多い場合
   if(n.buy > n.sell){
@@ -275,22 +275,42 @@ for(i in 1:n.repeat){
 }
 
 #####################################################################
+# 可視化のためのデータの作成
+# ・　取引回数と評価額や市場価格の推移を示す折れ線グラフ及び財と貨幣の保有量
+#　　についてのヒストグラムを作成するため、データを作成
 
+#折れ線グラフに用いるデータを抽出
+price_buy<- resmat$price.buy
+price_sell<- resmat$price.sell
+price_trade<- resmat$price
+share_of_buy<- resmat$n.buy / n.Trader
 
-#財と資産の分布を抽出
+#財と資産の分布を保存するデータフレーム
 distmat<- matrix(0,ncol=4,nrow=n.Trader) %>% as.data.frame()   #入れ物
 colnames(distmat)<- c("name","goods","money","total")
 
-for(i in 1:n.Trader){                      #各行に入れていく
+#ループでデータフレームに名称、財保有量、貨幣保有量、総資産を保存
+for(i in 1:n.Trader){
   distmat[i,1]<- Trader_list[[i]]$name
   distmat[i,2]<- Trader_list[[i]]$goods
   distmat[i,3]<- Trader_list[[i]]$money
   distmat[i,4]<- (distmat[i,2] * mkt.price) + distmat[i,3]
 }
 
-#レイアウト指定
+#####################################################################
+# 結果の可視化
+# ・　最初にレイアウトを指定し、エリアの上部60％に折れ線グラフ、下部40％を3列
+#　　に区分し、それぞれ財及び貨幣の保有量並びに総資産のヒストグラムを配置でき
+#　　るようにする
+# ・　そのうえで、まずグラフの上部に市場価格、買い手の評価額、売り手の評価額
+#　　及び取引主体数に占める買い手の割合をそれぞれ重ね描きする
+# ・　そのうえで、プロットエリアを変えながら、財保有量、貨幣保有量及び総資産
+#　　のヒストグラムを描いていく
+
+#レイアウトをリセット
 layout(1)
 
+#レイアウト指定：2行3列、行は3：2の幅
 laymat<- matrix(c(1,1,1,2,3,4),2,3,byrow=T)
 layout(laymat,
        heights=c(3,2))
@@ -298,12 +318,6 @@ layout(laymat,
 #グラフ表示のために価格の上下を抽出
 price.max<- max(resmat$price.buy)    #最大値は買値から
 price.min<- min(resmat$price.sell)   #最小値は売値から
-
-#グラフデータ
-price_buy<- resmat$price.buy
-price_sell<- resmat$price.sell
-price_trade<- resmat$price
-share_of_buy<- resmat$n.buy / n.Trader
 
 #グラフエリアを更新
 par(new=F)
