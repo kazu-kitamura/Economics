@@ -280,13 +280,13 @@ for(i in 1:n.repeat){
 #　　についてのヒストグラムを作成するため、データを作成
 
 #折れ線グラフに用いるデータを抽出
-price_buy<- resmat$price.buy
-price_sell<- resmat$price.sell
-price_trade<- resmat$price
-share_of_buy<- resmat$n.buy / n.Trader
+price_buy<- resmat$price.buy              #買い手の評価額
+price_sell<- resmat$price.sell            #売り手の評価額
+price_trade<- resmat$price                #市場価格
+share_of_buy<- resmat$n.buy / n.Trader    #取引主体に占める買い手の割合
 
 #財と資産の分布を保存するデータフレーム
-distmat<- matrix(0,ncol=4,nrow=n.Trader) %>% as.data.frame()   #入れ物
+distmat<- matrix(0,ncol=4,nrow=n.Trader) %>% as.data.frame()
 colnames(distmat)<- c("name","goods","money","total")
 
 #ループでデータフレームに名称、財保有量、貨幣保有量、総資産を保存
@@ -315,6 +315,7 @@ laymat<- matrix(c(1,1,1,2,3,4),2,3,byrow=T)
 layout(laymat,
        heights=c(3,2))
 
+#折れ線グラフ###########################################################
 #グラフ表示のために価格の上下を抽出
 price.max<- max(resmat$price.buy)    #最大値は買値から
 price.min<- min(resmat$price.sell)   #最小値は売値から
@@ -322,14 +323,14 @@ price.min<- min(resmat$price.sell)   #最小値は売値から
 #グラフエリアを更新
 par(new=F)
 
-#価格の推移をグラフ化
-plot(price_trade,
-     type="l",
-     axes=TRUE,
-     ylab="price",
-     xlab="period",
-     ylim=c(price.min,price.max),
-     col="black")
+#市場価格の推移をグラフ化
+plot(price_trade,                  #データ
+     type="l",                     #折れ線
+     axes=TRUE,                    #第一軸
+     ylab="price",                 #縦軸のラベル
+     xlab="period",                #横軸のラベル
+     ylim=c(price.min,price.max),  #横軸のレンジ
+     col="black")                  #折れ線の色
 
 #重ねて描く
 par(new=T)
@@ -361,41 +362,45 @@ par(new=T)
 #買い手の割合の推移をグラフ化（第二軸）
 plot(share_of_buy,
      type="l",
-     axes=FALSE,
+     axes=FALSE,                   #第二軸に指定
      ylab="",
      xlab="",
      col="green",
-     main="Transition of Prices")
+     main="Transition of Prices")  #グラフタイトル
 
-legend("topright",
-       legend=c("trade price",
+#凡例
+legend("topright",                 #凡例の位置
+       legend=c("trade price",     #項目名
                 "buy price",
                 "sell price",
                 "share of buy(right axe)"),
-       lty=1,
-       col=c("black",
+       lty=1,                       #折れ線
+       col=c("black",               #色
              "red",
              "blue",
              "green"))
 
 axis(4)
-mtext("price",
+mtext("share",
       side=4,
       line=2)
 
 #次のエリアに
 par(new=F)
 
-#財のヒストグラム
+#財保有量のヒストグラム
 hist(distmat$goods,
      main="Histgram of Goods")
 
 #次のエリアに
 par(new=F)
 
-#貨幣のヒストグラム
+#貨幣保有量のヒストグラム
 hist(distmat$money,
      main="Histgram of Money")
+
+#次のエリアに
+par(new=F)
 
 #総資産のヒストグラム
 hist(distmat$total,
