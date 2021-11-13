@@ -1,0 +1,17 @@
+print("効用関数の定義 x実物 y金融 a実物選好");
+U(x,y):=x^a*y^(1-a);
+print("限界効用＝x、yで偏微分");
+dUx:diff(U(x,y),x,1);
+dUy:diff(U(x,y),y,1);
+print("限界代替率＝MRS＝xの偏微分／yの偏微分");
+MRS:dUx/dUy;
+print("価格比をpと置き、MRS=pをyについて解く");
+f:solve(MRS=p,y)[1];
+print("予算制約式の定義");
+g:p*x+y=I;
+print("予算制約式にyの解を代入");
+h:subst(rhs(f),y,g);
+print("上式をxについて解く");
+J:solve(h,x)[1];
+print("代入してyを得る");
+subst(rhs(J),x,f);
