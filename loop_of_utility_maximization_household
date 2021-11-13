@@ -1,0 +1,378 @@
+#####################################################################
+# 準備
+gc();gc(reset=TRUE)
+print("gc done")
+rm(list=ls(all.names=TRUE))
+
+# 乱数シードの固定
+set.seed(555)
+
+# パッケージの読み込み
+library(R6)
+library(dplyr)
+
+#####################################################################
+# マーケットとプレイヤーの設定
+# とりあえず家計のみ
+# ごく一般的な効用最大化問題だが、
+# ・家計はフローではなく、ストックの資産から効用を得るものとし、実物選好aを媒介に
+# 　一次同次のコブダグラス型効用関数を設定する
+# ・選択できる資産は実物資産と金融資産の二種類で、後者からも効用を得る
+# ・実物資産は消費によって増え（なので「飯食って元気になった」なども含む広義の「資産」
+# 　と考える）、償却率によって減耗する
+# ・価格は実物資産／金融資産とした相対価格
+# 家計は初期値として乱数で与えられた各々異なる実物資産量、金融資産量と、期を通じて変化
+# しない実物資産への選好を有する
+# 毎期、経済全体で同じ相対価格と各家計ごとに異なる所得が乱数で与えられ、各家計は
+# 効用関数に基づく最適保有量との差が小さくなるよう、実物資産への配分を行う
+
+#マーケットの設定
+n.Household<- 100                #家計
+#n.Enterprise<- n.Household / 10  #企業
+#adjSpeed<- 0.3                   #価格調整のスピード
+n.repeat<- 100                   #取引回数
+init.price<- 1.1                 #相対価格（＝実物資産価格／金融資産価格）の初期値
+
+#家計部門の設定
+max.real.asset<- 100    #実物資産の最大・最小
+min.real.asset<- 10
+max.fin.asset<- 100     #金融資産の最大・最小
+min.fin.asset<- 10
+min.subrate<- 0.2       #実物選好の最大・最小
+max.subrate<- 0.8
+hh.deprate<- 0.10       #家計の実物資産の償却率
+
+#家計の設定
+Household<- R6Class(classname="Household",
+                    public=list(
+                      name="H0000",  #名前
+                      real.asset=0,  #実物資産
+                      fin.asset=0,   #金融資産
+                      subrate=0.0,   #実物選好
+                      Utility=0.0,   #効用
+                      total.asset=0, #総資産
+                      
+                      #初期化メソッド
+                      initialize=function(name,
+                                          real.asset,
+                                          fin.asset,
+                                          subrate,
+                                          price){
+                        self$name<-       name
+                        self$real.asset<- real.asset
+                        self$fin.asset<-  fin.asset
+                        self$subrate<-    subrate
+                        
+                        #効用は効用関数に基づいて保有資産量から
+                        self$Utility<-    (self$real.asset ^ self$subrate) *
+                          (self$fin.asset ^ (1 - self$subrate))
+                        
+                        #総資産は保有資産量、実物は相対価格で名目化
+                        self$total.asset<- 
+                          self$real.asset * price + self$fin.asset
+                      },
+#消費選択のメソッド
+# 効用関数を U = real.asset ^ subrate * fin.asset ^ (1 - subrate)
+# 予算制約を (income + total.asset) = price * real.asset + fin.asset　とすると
+# Uの偏微分及び予算制約式から、最適選択は
+# real.asset = ((income + total.asset) * subrate) / price
+# fin.asset = (1 - subrate) * (income + total.asset)
+# 導出のプロセスはmaximaのコード https://github.com/kazu-kitamura/Economics/blob/main/utility_maximization_household
+
+                      opt.choice=function(price,
+                                          income){
+                        #実物資産の減価償却
+                        self$real.asset<- self$real.asset * (1 - hh.deprate)
+                        self$total.asset<- 
+                          self$real.asset * price + self$fin.asset
+                        
+                        #最適な資産配分
+                        best.real.asset<- ((income + self$total.asset) * 
+                                             self$subrate) / price
+                        best.fin.asset<- (1 - self$subrate) *
+                          (income + self$total.asset)
+                        
+                        #所得と最適保有量及び現有実物資産の差から条件分岐
+                        #そもそも最適＜現有であれば全て貯蓄
+                        if(best.real.asset < self$real.asset){
+                          temp.consump<- 0
+                          temp.saving<- income
+                        
+                        #０＜最適ー現有＜所得であれば必要分だけを消費
+                        }else if(0 < best.real.asset - self$real.asset &
+                                 best.real.asset - self$real.asset < income){
+                          temp.consump<- best.real.asset - self$real.asset
+                          temp.saving<- income - 
+                            (best.real.asset - self$real.asset) * price
+                        
+                        #最適ー現有＞所得であれば全て消費
+                        }else{
+                          temp.consump<- income
+                          temp.saving<- 0
+                        }
+                        
+                        #資産状況を改定
+                        self$real.asset<- self$real.asset + temp.consump
+                        self$fin.asset<- self$fin.asset + temp.saving
+                        
+                        #総資産と効用を再評価
+                        self$total.asset<- 
+                          self$real.asset * price + self$fin.asset
+                        self$Utility<-    (self$real.asset ^ self$subrate) *
+                          (self$fin.asset ^ (1 - self$subrate))
+                      },
+
+                      #変数排出メソッド
+                      dfout= function(){
+                        df<- matrix(NA,ncol=6,nrow=1) %>% as.data.frame()
+                        colnames(df)<- c("名前",
+                                         "実物資産",
+                                         "金融資産",
+                                         "総資産",
+                                         "実物選好",
+                                         "効用")
+                        df[1,1]<- self$name
+                        df[1,2:6]<- c(self$real.asset,
+                                      self$fin.asset,
+                                      self$total.asset,
+                                      self$subrate,
+                                      self$Utility)
+                        return(df)
+                      }
+                      ))
+
+#家計のインスタンスを保存するリスト
+Household.list<- list()
+
+#家計のパラメータを保存するリスト
+Household.mat<- matrix(NA,ncol=6,nrow=n.Household) %>% as.data.frame()
+temp.colname<- c("名前","実物資産","金融資産","総資産","実物選好","効用")
+colnames(Household.mat)<- temp.colname
+
+Household.para<- list()
+for(i in 1:n.repeat){
+  Household.para[[i]]<- Household.mat
+}
+
+#初期インスタンスの作成
+for(i in 1:n.Household){
+  #各インスタンスの名前と、変数は初期値を乱数で得る
+  temp.name<- paste0("H",formatC(i,width=4,flag=0))
+  temp.real.asset<- round(runif(1,min.real.asset,max.real.asset))
+  temp.fin.asset<- round(runif(1,min.fin.asset,max.fin.asset))
+  temp.subrate<- runif(1,min.subrate,max.subrate)
+  
+  #インスタンスの作成
+  Household.list[[i]]<- Household$new(name=temp.name,
+                                      real.asset=temp.real.asset,
+                                      fin.asset=temp.fin.asset,
+                                      subrate=temp.subrate,
+                                      price=init.price)
+  
+  #初期値を抽出
+  Household.para[[1]][i,]<- Household.list[[i]]$dfout()
+}
+
+#####################################################
+#暫定的に乱数で与える（いずれ企業セクターとの市場取引を考える）
+max.income<- 30  #所得の最大・最小
+min.income<- 0
+max.price<- 1.2  #相対価格の最大・最小
+min.price<- 0.9
+
+#乱数でリピート
+for(i in 2:n.repeat){
+  #相対価格の設定（これは全てのインスタンスについて同じ）
+  temp.price<- runif(1,min.price,max.price)
+  
+  #lapplyで一気に更新
+  Household.list<- lapply(Household.list,function(x){
+    #所得の設定（これは各家計ごとに異なる）
+    temp.income<- runif(1,min.income,max.income)
+    
+    #メソッドで更新
+    x$opt.choice(price=temp.price,
+                 income=temp.income)
+    x
+  })
+  
+  #結果の出力
+  for(j in 1:n.Household){
+    Household.para[[i]][j,]<- Household.list[[j]]$dfout()
+  }
+}
+
+#####################################################
+#可視化
+layout(1)
+
+laymat<- matrix(c(1,2,3,4),2,2,byrow=T)
+layout(laymat,
+       heights=c(2,2))
+
+#初期値のヒストグラム
+#実物資産
+par(new=F)
+hist(Household.para[[1]]$実物資産,
+     main="実物資産：初期値",
+     xlim=c(min.real.asset,max.real.asset),
+     xlab="",
+     ylab="")
+
+#金融資産
+par(new=F)
+hist(Household.para[[1]]$金融資産,
+     main="金融資産：初期値",
+     xlim=c(min.fin.asset,max.fin.asset),
+     xlab="",
+     ylab="")
+
+#結果のヒストグラム
+#実物資産
+par(new=F)
+hist(Household.para[[n.repeat]]$実物資産,
+     main="実物資産：結果",
+     xlab="",
+     ylab="")
+
+#金融資産
+par(new=F)
+hist(Household.para[[n.repeat]]$金融資産,
+     main="金融資産：結果",
+     xlab="",
+     ylab="")
+
+#２枚目
+layout(1)
+
+laymat<- matrix(c(1,1,2,3),2,2,byrow=T)
+layout(laymat,
+       heights=c(3,2))
+
+#ジニ係数の結果用データフレーム
+dist.mat<- matrix(NA,ncol=4,nrow=n.repeat) %>% as.data.frame()
+colnames(dist.mat)<- c("実物資産","金融資産","総資産","効用")
+
+#ジニ係数を算出する関数
+get.gini<- function(x){
+  x.sort<- x[order(x,decreasing=F)]
+  x.cumsum<- cumsum(x.sort) / sum(x.sort)
+  bt<- length(x)/2
+  gn<- sum(x.cumsum)
+  gini<- (bt-gn)/bt
+  return(gini)
+}
+
+#ジニ係数の算出
+for(i in 1:n.repeat){
+  
+  #リピートで各家計の値を抽出してベクトルにまとめる
+  for(j in 1:n.Household){
+    if(j == 1){
+      real.vec<- Household.para[[i]][j,2]
+      fin.vec<- Household.para[[i]][j,3]
+      total.vec<- Household.para[[i]][j,4]
+      Utility.vec<- Household.para[[i]][j,6]
+    }else{
+      real.vec<- c(real.vec,Household.para[[i]][j,2])
+      fin.vec<- c(fin.vec,Household.para[[i]][j,3])
+      total.vec<- c(total.vec,Household.para[[i]][j,4])
+      Utility.vec<- c(Utility.vec,Household.para[[i]][j,6])
+    }
+  }
+  
+  #まとめたベクトルからジニ係数を算出
+  gini.real<- get.gini(real.vec)
+  gini.fin<- get.gini(fin.vec)
+  gini.total<- get.gini(total.vec)
+  gini.Utility<- get.gini(Utility.vec)
+  
+  #当該回のジニ係数を結果データフレームへ
+  dist.mat[i,]<- c(gini.real,
+                   gini.fin,
+                   gini.total,
+                   gini.Utility)
+}
+
+#可視化
+par(new=F)
+
+#グラフ用データ
+real.g<- dist.mat$実物資産
+fin.g<- dist.mat$金融資産
+total.g<- dist.mat$総資産
+Utility.g<- dist.mat$効用
+
+max.lim<- max(real.g,fin.g,total.g,Utility.g)+0.03
+min.lim<- min(real.g,fin.g,total.g,Utility.g)-0.03
+
+#実物資産のグラフ
+plot(real.g,
+     type="l",
+     axes=T,
+     ylab="ジニ係数",
+     xlab="period",
+     ylim=c(min.lim,max.lim),
+     col="blue")
+
+#金融資産のグラフ
+par(new=T)
+
+plot(fin.g,
+     type="l",
+     axes=T,
+     ylab="",
+     xlab="",
+     ylim=c(min.lim,max.lim),
+     col="red")
+
+#総資産のグラフ
+par(new=T)
+
+plot(total.g,
+     type="l",
+     axes=T,
+     ylab="",
+     xlab="",
+     ylim=c(min.lim,max.lim),
+     col="gray")
+
+#効用のグラフ
+par(new=T)
+
+plot(Utility.g,
+     type="l",
+     axes=T,
+     ylab="",
+     xlab="",
+     ylim=c(min.lim,max.lim),
+     col="green",
+     main="ジニ係数の推移")
+
+#凡例
+legend("topleft",
+       legend=c("実物資産",
+                "金融資産",
+                "総資産",
+                "効用"),
+       lty=1,
+       col=c("blue",
+             "red",
+             "gray",
+             "green"),
+       bty="n")
+
+
+#総資産の初期値のヒストグラム
+par(new=F)
+hist(Household.para[[1]]$総資産,
+     main="総資産：初期値",
+     xlab="",
+     ylab="")
+
+#総資産の結果のヒストグラム
+par(new=F)
+hist(Household.para[[n.repeat]]$総資産,
+     main="総資産：結果",
+     xlab="",
+     ylab="")
