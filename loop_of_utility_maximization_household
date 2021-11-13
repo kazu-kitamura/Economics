@@ -27,7 +27,7 @@ library(dplyr)
 # 効用関数に基づく最適保有量との差が小さくなるよう、実物資産への配分を行う
 
 #マーケットの設定
-n.Household<- 100                #家計
+n.Household<- 500                #家計
 #n.Enterprise<- n.Household / 10  #企業
 #adjSpeed<- 0.3                   #価格調整のスピード
 n.repeat<- 100                   #取引回数
