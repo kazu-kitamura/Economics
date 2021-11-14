@@ -1,0 +1,65 @@
+library(dplyr)   # データ操作
+library(tidyr)   # データ操作
+library(lubridate)   # 日付操作
+library(stringr)   # 文字列操作
+
+#データの読み込み
+df<- read.csv("C:/Users/user/Downloads/00_zenkoku_all_20211029/00_zenkoku_all_20211029.csv",
+              header=F)[,1:11]
+
+setwd("C:/Users/user/Documents/sync_folder/onedrive/業務（一時保管）")
+
+#列名を付加
+colnames(df)<- c("一連番号",
+                 "法人番号",
+                 "処理区分",
+                 "訂正区分",
+                 "更新年月日",
+                 "変更年月日",
+                 "商号又は名称",
+                 "イメージID",
+                 "法人種別",
+                 "都道府県",
+                 "市町村")
+
+#必要列だけ抽出
+df2<- df[,c("法人番号",
+            "処理区分",
+            "訂正区分",
+            "変更年月日",
+            "商号又は名称",
+            "法人種別",
+            "都道府県",
+            "市町村")]
+
+#一旦保存
+write.csv(df2,"houjindata.csv")
+
+#必要な法人種別のデータのみ残す(301株式会社、302有限、303合資、304合名、305合同、401外国会社等、499その他)
+df3<- df2[df2$法人種別 %in% c(301,302,303,304,305,401,499),]
+
+#手続き日付を日付型に変更し、月で丸める
+df3$変更年月日<- ymd(df3$変更年月日)
+df3$変更年月<- paste0(year(df3$変更年月日),
+                  "-",
+                  formatC(month(df3$変更年月日),width=2,flag=0),
+                  "-01") %>% ymd()
+
+#処理区分の新設（01）のみを抽出してピボット
+df_shinsetsu<- df3[df3$処理区分 == 1,]
+df_shinsetsu.total<- df_shinsetsu %>%
+  group_by(都道府県,変更年月) %>%
+  summarize(件数=n()) %>%
+  spread(変更年月,件数) %>%
+  as.data.frame()
+
+#処理区分の21登記閉鎖、71吸収合併、81登記抹消、99削除を抽出してピボット
+df_shometsu<- df3[df3$処理区分 %in% c(21,71,81,99),]
+df_shometsu.total<- df_shometsu %>%
+  group_by(都道府県,変更年月) %>%
+  summarize(件数=n()) %>%
+  spread(変更年月,件数) %>%
+  as.data.frame()
+
+write.csv(df_shinsetsu.total,"shinsetsu.csv")
+write.csv(df_shometsu.total,"shometsu.csv")
