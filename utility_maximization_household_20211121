@@ -1,0 +1,21 @@
+/*効用関数の定義（効用はフローではなくストックから）*/
+U:(d*RA[t-1] + C[t])^a * (FA[t-1] + S[t])^(1-a);
+/*消費及び貯蓄で偏微分*/
+dUx:diff(U,C[t],1);  
+dUy:diff(U,S[t],1);
+/*限界代替率*/
+MRS:dUx/dUy;
+/*実物資産と金融資産の相対価格をpとしてSについて解く*/
+Seq:solve(MRS=p,S[t])[1];
+St:rhs(%);
+/*予算制約式（予算制約はフロー）*/
+f:Y[t]=p*C[t]+S[t];
+/*制約式にSを代入し、Cについて解く*/
+subst(St,S[t],f);
+rat(%,C[t]);
+solve(%,C[t])[1];
+Ct:rhs(%);
+/*Sの式にCを代入*/
+subst(Ct,C[t],Seq);
+rat(%,RA[t-1]);
+ratsimp(%);
