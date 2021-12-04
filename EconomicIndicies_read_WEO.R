@@ -1,3 +1,4 @@
+#IMFのWorld Economic Outlookをロング型データで取得するためのスクリプト
 # ライブラリの読み込み
 library(dplyr) # 行列操作
 library(tidyr) # 行列操作
