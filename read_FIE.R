@@ -1,3 +1,4 @@
+#家計調査をロング型データで取得するためのスクリプト
 library(dplyr)
 library(tidyr)
 library(rvest)
