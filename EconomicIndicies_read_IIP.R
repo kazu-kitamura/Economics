@@ -1,3 +1,4 @@
+#鉱工業生産指数をロング型データで取得するためのスクリプト
 library(dplyr)
 library(tidyr)
 library(rvest)
