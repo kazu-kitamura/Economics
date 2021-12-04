@@ -1,3 +1,4 @@
+#商業動態統計をロング型データで取得するためのスクリプト
 library(dplyr)
 library(tidyr)
 library(rvest)
