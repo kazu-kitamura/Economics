@@ -1,3 +1,4 @@
+#四半期GDPをロング型データで取得するためのスクリプト
 library(dplyr)
 library(tidyr)
 library(rvest)
