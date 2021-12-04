@@ -1,3 +1,4 @@
+#マクロ経済指標をロング型データで取得するためのスクリプト
 library(dplyr)
 library(tidyr)
 library(rvest)
