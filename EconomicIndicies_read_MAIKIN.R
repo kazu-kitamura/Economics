@@ -1,3 +1,4 @@
+#毎月勤労統計をロング型データで取得するためのスクリプト
 library(dplyr)
 library(tidyr)
 library(rvest)
