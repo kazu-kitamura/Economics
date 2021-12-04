@@ -1,3 +1,4 @@
+#職業安定業務統計をロング型データで取得するためのスクリプト
 library(dplyr)
 library(tidyr)
 library(rvest)
