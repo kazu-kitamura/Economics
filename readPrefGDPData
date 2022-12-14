@@ -1,0 +1,241 @@
+library(openxlsx)
+library(tidyr)
+gc();gc(reset=TRUE)
+print("gc done")
+rm(list=ls(all.names=TRUE))
+
+library(dplyr)
+library(lubridate)
+library(stringr)
+
+dummyTable<- data.frame(matrix(NA,ncol=6,nrow=1))
+colnames(dummyTable)<- c("区分","系列名","名実","地域","年","値")
+
+#################################
+###　総括表
+#################################
+
+### 関数定義
+asNum<- function(df){
+  for(i in 2:ncol(df)){
+    df[,i]<- as.numeric(df[,i])
+  }
+  df
+}
+
+funcPop<- function(df2006,df2011,itemName){
+  df2006<- df2006[1:48,2:8] %>% asNum()
+  df2011<- df2011[1:48,2:(ncol(df2011)-1)] %>% asNum()
+  df_def<- df2011[,2] / df2006[,7]
+  
+  temp2006<- apply(df2006[,2:ncol(df2006)],2,function(x){x/df_def}) %>%
+    as.data.frame()
+  df2006<- cbind(df2006[,1],temp2006[,1:(ncol(temp2006)-1)])
+  
+  colnames(df2006)<- c("地域",colnames(df2006)[2:ncol(df2006)])
+  colnames(df2011)<- c("地域",colnames(df2011)[2:ncol(df2011)])
+  df<- left_join(df2006,df2011,key=地域)
+  
+  tempTable<- gather(df,key="年",value="値",2:ncol(df))
+  tempTable$系列名<- itemName
+  tempTable$区分<- "総括表"
+  tempTable$名実<- NA
+  tempTable<- tempTable[,colnames(dummyTable)]
+  tempTable
+}
+
+### 総人口
+Pop2006<- read.xlsx("https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2018/soukatu9.xlsx",
+                    startRow = 5,
+                    sheet = 1)
+Pop2011<- read.xlsx("https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2019/soukatu9.xlsx",
+                    startRow = 5,
+                    sheet = 1)
+Pop<- funcPop(Pop2006,Pop2011,"総人口")
+
+###　県内ベース（経済活動地ベース）の就業者数
+Wor2011<- read.xlsx("https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2019/soukatu10.xlsx",
+                    startRow = 5,
+                    sheet = 1)
+Wor2006<- read.xlsx("https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2018/soukatu10.xlsx",
+                    startRow = 5,
+                    sheet = 1)
+Wor<- funcPop(Wor2006,Wor2011,"県内就業者数")
+
+###　県民ベース（居住地ベース）の雇用者数
+Lab2011<- read.xlsx("https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2019/soukatu11.xlsx",
+                    startRow = 5,
+                    sheet = 1)
+Lab2006<- read.xlsx("https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2018/soukatu11.xlsx",
+                    startRow = 5,
+                    sheet = 1)
+Lab<- funcPop(Lab2006,Lab2011,"県民雇用者数")
+
+###　統合
+DataBase<- rbind(Pop,Wor,Lab)
+
+#################################
+###　系列表
+#################################
+
+###　関数定義
+readSheet<- function(fileName,SheetNo,Kubun){
+  df<- read.xlsx(xlsxFile=fileName,sheet=SheetNo)
+  
+  df_num<- match("北海道",df[,2])
+  df_val<- df[df_num:(df_num+47),2:(ncol(df)-1)]
+  
+  df_head<- df[2:(df_num-1),2:ncol(df)]
+  if(Kubun == "県民所得"){
+    for(i in 1:ncol(df_head)){
+      for(j in 1:nrow(df_head)){
+        df_head[j,i]<- str_remove_all(df_head[j,i],"[ァ-ヴ]|
+                                      (地方政府等)|
+                                      (企業部門の第１次所得バランス)|
+                                      (控除)|
+                                      (市場価格|
+                                      表示)|
+                                      (第１次所得|
+                                      バランス)")
+      }
+    }
+  }
+  
+  for(i in 1:ncol(df_head)){
+    if(i == 1){
+      header<- "地域"
+    }else{
+      tempName<- ""
+      for(j in 1:nrow(df_head)){
+        if(!is.na(df_head[j,i])){
+          if(j == 1){
+            header[i]<- df_head[j,i]
+          }else{
+            header[i]<- paste0(tempName,"_",df_head[j,i])
+          }
+          break
+        }else{
+          if(!is.na(df_head[j,i-1]) && df_head[j,i-1] != "都道府県"){
+            df_head[j,i]<- df_head[j,i-1]
+            tempName<- paste0(tempName,"_",df_head[j,i])
+          }
+        }
+      }
+    }
+  }
+  header<- str_remove_all(header,"\n") %>%
+    str_remove_all("　")
+  header[grep("都道府県",header)]<- NA
+  
+  colnames(df_val)<- header
+  df<- df_val[,!is.na(colnames(df_val))] %>% asNum() %>% as.data.frame()
+  colnames(df)<- c("地域",colnames(df[,2:ncol(df)]))
+  
+  df
+}
+
+funcSer<- function(Path2006,Path2011,Kubun,Meijitsu){
+  file2006<- loadWorkbook(Path2006)
+  file2011<- loadWorkbook(Path2011)
+  
+  sheetNum2006<- file2006@.xData$sheet_names %>% length()
+  sheetNum2011<- file2011@.xData$sheet_names %>% length()
+  
+  lis2006<- list()
+  lis2011<- list()
+  
+  for(i in 1:sheetNum2011){
+    if(Kubun == "県内総支出"){
+      temp<- readSheet(file2011,i,Kubun)
+      temp$`_民間最終消費支出_家計最終消費支出_その他`<- sum(temp$`_民間最終消費支出_家計最終消費支出_保険・金融サービス`,
+                     temp$`_民間最終消費支出_家計最終消費支出_個別ケア・社会保護・その他`,
+                     na.rm=T)
+      lis2011[[i+5]]<- temp[,c(colnames(temp[,1:14]),
+                               "_民間最終消費支出_家計最終消費支出_その他",
+                               colnames(temp[,17:(ncol(temp)-1)]))]
+    }else{
+      lis2011[[i+5]]<- readSheet(file2011,i,Kubun)
+    }
+  }
+  
+  for(i in 1:6){
+    if(Kubun == "県民所得" | Kubun == "県内総支出"){
+      lis2006[[i]]<- readSheet(file2006,i,Kubun)
+      if(i == 1){
+        tempname<- colnames(lis2006[[i]])
+      }
+      colnames(lis2006[[i]])<- colnames(lis2011[[6]])
+    }else{
+      lis2006[[i]]<- readSheet(file2006,i,Kubun)[,colnames(lis2011[[6]])]
+    }
+  }
+  
+  if(Kubun == "県内総支出" & Meijitsu == "実質"){
+    for(i in 6:sheetNum2011){
+      colnames(lis2011[[i]])<- tempname
+    }
+  }
+  
+  def_mat<- lis2011[[6]][,2:ncol(lis2011[[6]])] /lis2006[[6]][,2:ncol(lis2006[[6]])]
+  
+  for(i in 1:5){
+    lis2011[[i]]<- cbind(lis2006[[i]][,1],lis2006[[i]][,2:ncol(lis2006[[i]])] * def_mat)
+    colnames(lis2011[[i]])<- c("地域",colnames(lis2011[[i]][,2:ncol(lis2011[[i]])]))
+  }
+  
+  for(i in 1:length(lis2011)){
+    if(i == 1){
+      tempTable<- gather(lis2011[[i]],key=系列名,value=値,-地域)
+      tempTable$年<- 2006
+    }else{
+      temp<- gather(lis2011[[i]],key=系列名,value=値,-地域)
+      temp$年<- 2006+i-1
+      tempTable<- rbind(tempTable,temp)
+    }
+  }
+  tempTable$区分<- Kubun
+  tempTable$名実<- Meijitsu
+  tempTable<- tempTable[,colnames(dummyTable)]
+  
+  if(Kubun == "県内総支出"){
+    tempTable$系列名<- str_remove_all(tempTable$系列名,"アイダサイオワリ|ケイサイオワリ")
+  }
+  
+  tempTable
+}
+
+###　県内総生産（名目）
+PathNomProd2006<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2018/syuyo1.xlsx"
+PathNomProd2011<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2019/syuyo1.xlsx"
+
+NomProd<- funcSer(PathNomProd2006,PathNomProd2011,"県内総生産","名目")
+
+###　県内総生産（実質）
+PathReaProd2006<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2018/syuyo2.xlsx"
+PathReaProd2011<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2019/syuyo2.xlsx"
+
+ReaProd<- funcSer(PathReaProd2006,PathReaProd2011,"県内総生産","実質")
+
+### 県民所得
+PathIncome2006<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2018/syuyo3.xlsx"
+PathIncome2011<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2019/syuyo3.xlsx"
+
+Income<- funcSer(PathIncome2006,PathIncome2011,"県民所得",NA)
+
+### 県内総支出（名目）
+PathNomExp2006<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2018/syuyo4.xlsx"
+PathNomExp2011<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2019/syuyo4.xlsx"
+
+NomExp<- funcSer(PathNomExp2006,PathNomExp2011,"県内総支出","名目")
+
+### 県内総支出（実質）
+PathReaExp2006<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2018/syuyo5.xlsx"
+PathReaExp2011<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2019/syuyo5.xlsx"
+
+ReaExp<- funcSer(PathReaExp2006,PathReaExp2011,"県内総支出","実質")
+
+DataBase<- rbind(DataBase,NomProd,ReaProd,Income,NomExp,ReaExp)
+write.csv(DataBase,"DataBase.csv",fileEncoding = "Shift-Jis")
+
+
+
