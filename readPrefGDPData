@@ -23,9 +23,22 @@ asNum<- function(df){
   df
 }
 
+funcPrefCode<- function(df){
+  for(i in 1:nrow(df)){
+    if(i != nrow(df)){
+      df[i,1]<- paste0(formatC(i,width=2,flag=0),"_",df[i,1])
+    }else{
+      df[i,1]<- paste0("99_",df[i,1])
+    }
+  }
+  df
+}
+
 funcPop<- function(df2006,df2011,itemName){
-  df2006<- df2006[1:48,2:8] %>% asNum()
+  df2006_temp<- df2006[1:48,2:8] %>% asNum()
+  df2006<- funcPrefCode(df2006_temp)
   df2011<- df2011[1:48,2:(ncol(df2011)-1)] %>% asNum()
+  df2011<- funcPrefCode(df2011)
   df_def<- df2011[,2] / df2006[,7]
   
   temp2006<- apply(df2006[,2:ncol(df2006)],2,function(x){x/df_def}) %>%
@@ -40,6 +53,7 @@ funcPop<- function(df2006,df2011,itemName){
   tempTable$系列名<- itemName
   tempTable$区分<- "総括表"
   tempTable$名実<- NA
+
   tempTable<- tempTable[,colnames(dummyTable)]
   tempTable
 }
@@ -79,11 +93,43 @@ DataBase<- rbind(Pop,Wor,Lab)
 #################################
 
 ###　関数定義
+makeColName<- function(df_h){
+  header<- "地域"
+  layerNo<- c(1,1,1,1,1)
+  
+  for(j in 2:ncol(df_h)){
+    tempI< 0
+
+    for(i in 1:nrow(df_h)){
+      tempI<- tempI + 1
+      
+      if(is.na(df_h[i,j]) | df_h[i,j] == "都道府県"){
+        df_h[i,j]<- df_h[i,j-1]
+      }else{
+        df_h[i,j]<- paste0(formatC(layerNo[i],width=2,flag=0),"_",df_h[i,j])
+        layerNo[i]<- layerNo[i] + 1
+        
+        for(k in 1:i){
+          if(k == 1){
+            tempName<- df_h[k,j]
+          }else{
+            tempName<- paste0(tempName,"_",df_h[k,j])
+          }
+        }
+        header[j]<- tempName
+        break
+      }
+    }
+  }
+  header
+}
+
 readSheet<- function(fileName,SheetNo,Kubun){
   df<- read.xlsx(xlsxFile=fileName,sheet=SheetNo)
   
   df_num<- match("北海道",df[,2])
-  df_val<- df[df_num:(df_num+47),2:(ncol(df)-1)]
+  df_val<- df[df_num:(df_num+47),2:(ncol(df)-1)] %>%
+    funcPrefCode()
   
   df_head<- df[2:(df_num-1),2:ncol(df)]
   if(Kubun == "県民所得"){
@@ -101,28 +147,7 @@ readSheet<- function(fileName,SheetNo,Kubun){
     }
   }
   
-  for(i in 1:ncol(df_head)){
-    if(i == 1){
-      header<- "地域"
-    }else{
-      tempName<- ""
-      for(j in 1:nrow(df_head)){
-        if(!is.na(df_head[j,i])){
-          if(j == 1){
-            header[i]<- df_head[j,i]
-          }else{
-            header[i]<- paste0(tempName,"_",df_head[j,i])
-          }
-          break
-        }else{
-          if(!is.na(df_head[j,i-1]) && df_head[j,i-1] != "都道府県"){
-            df_head[j,i]<- df_head[j,i-1]
-            tempName<- paste0(tempName,"_",df_head[j,i])
-          }
-        }
-      }
-    }
-  }
+  header<- makeColName(df_head)
   header<- str_remove_all(header,"\n") %>%
     str_remove_all("　")
   header[grep("都道府県",header)]<- NA
@@ -236,6 +261,3 @@ ReaExp<- funcSer(PathReaExp2006,PathReaExp2011,"県内総支出","実質")
 
 DataBase<- rbind(DataBase,NomProd,ReaProd,Income,NomExp,ReaExp)
 write.csv(DataBase,"DataBase.csv",fileEncoding = "Shift-Jis")
-
-
-
