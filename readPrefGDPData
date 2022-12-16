@@ -7,6 +7,7 @@ rm(list=ls(all.names=TRUE))
 library(dplyr)
 library(lubridate)
 library(stringr)
+library(rvest)
 
 dummyTable<- data.frame(matrix(NA,ncol=6,nrow=1))
 colnames(dummyTable)<- c("区分","系列名","名実","地域","年","値")
@@ -328,6 +329,175 @@ PathReaExp2011<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/
 ReaExp<- funcSer(PathReaExp2006,PathReaExp2011,"県内総支出","実質")
 
 DataBase<- rbind(DataBase,NomProd,ReaProd,Income,NomExp,ReaExp)
+
+#################################
+###　付表
+#################################
+
+###　URL取得
+html2006<- read_html("https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/main_2018.html") %>%
+  html_nodes("a") %>% html_attr("href")
+html2006<- html2006[str_detect(html2006,"huhyo") == T]
+for(i in length(html2006):(length(html2006)-5)){
+  temp<- paste0("https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/",
+                html2006[i])
+  if(i == length(html2006)){
+    url2006<- temp
+  }else{
+    url2006<- c(url2006,temp)
+  }
+}
+
+html2011<- read_html("https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/main_2019.html") %>%
+  html_nodes("a") %>% html_attr("href")
+html2011<- html2011[str_detect(html2011,"huhyo") == T]
+for(i in length(html2011):1){
+  temp<- paste0("https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/",
+                html2011[i])
+  if(i == length(html2011)){
+    url2011<- temp
+  }else{
+    url2011<- c(url2011,temp)
+  }
+}
+
+###　関数定義
+funcReadHuhyo<- function(urlvec,startyear){
+  filelist<- list()
+  datalist<- list()
+  
+  for(i in 1:length(urlvec)){
+    filelist[[i]]<- loadWorkbook(urlvec[i])
+    
+    tempName<- filelist[[i]]@.xData$sheet_names
+    tempName<- tempName[str_detect(tempName,"（１）") ==T|
+                          str_detect(tempName,"（２）") ==T|
+                          str_detect(tempName,"（３）") ==T|
+                          str_detect(tempName,"（４）") ==T|
+                          str_detect(tempName,"（５）") ==T|
+                          str_detect(tempName,"（６）") ==T|
+                          str_detect(tempName,"（７）") ==T|
+                          str_detect(tempName,"（８）") ==T|
+                          str_detect(tempName,"（９）") ==T|
+                          str_detect(tempName,"（１０）") ==T|
+                          str_detect(tempName,"（１１）") ==T|
+                          str_detect(tempName,"（１２）") ==T|
+                          str_detect(tempName,"（１３）") ==T|
+                          str_detect(tempName,"（１４）") ==T|
+                          str_detect(tempName,"（１５）") ==T|
+                          str_detect(tempName,"（１６）") ==T|
+                          str_detect(tempName,"合計") ==T]
+    listname<- str_replace_all(tempName,"（１）","01_") %>%
+      str_replace_all("（２）","02_") %>%
+      str_replace_all("（３）","03_") %>%
+      str_replace_all("（４）","04_") %>%
+      str_replace_all("（５）","05_") %>%
+      str_replace_all("（６）","06_") %>%
+      str_replace_all("（７）","07_") %>%
+      str_replace_all("（８）","08_") %>%
+      str_replace_all("（９）","09_") %>%
+      str_replace_all("（１０）","10_") %>%
+      str_replace_all("（１１）","11_") %>%
+      str_replace_all("（１２）","12_") %>%
+      str_replace_all("（１３）","13_") %>%
+      str_replace_all("（１４）","14_") %>%
+      str_replace_all("（１５）","15_") %>%
+      str_replace_all("（１６）","16_") %>%
+      str_replace_all("合計","99_合計")
+    datalist[[i]]<- list()
+    for(j in 1:length(tempName)){
+      temp<- read.xlsx(xlsxFile = filelist[[i]],sheet = tempName[j])
+      StartRow<- match("北海道",temp[,2])
+      temp<- temp[StartRow:(StartRow + 47),2:11]
+      temp01<- temp[,1] %>% as.data.frame()
+      for(k in 1:nrow(temp01)){
+        if(k != nrow(temp01)){
+          temp01[k,]<- paste0(formatC(k,width=2,flag=0),"_",temp01[k,])
+        }else{
+          temp01[k,]<- paste0("99_",temp01[k,])
+        }
+      }
+      temp02<- apply(temp[,2:ncol(temp)],2,as.numeric) %>% as.data.frame()
+      temp<- cbind(temp01,temp02)
+      colnames(temp)<- c("地域","01_産出額","02_中間投入","03_県内総生産",
+                         "04_固定資本減耗","05_県内純生産","06_税（控除）補助金",
+                         "07_県内要素所得",
+                         "07_県内要素所得_01_県内雇用者報酬",
+                         "07_県内要素所得_02_営業余剰・混合所得")
+      datalist[[i]][[j]]<- temp
+    }
+    names(datalist[[i]])<- listname
+  }
+  names(datalist)<- c(startyear:(startyear + length(datalist) - 1))
+  datalist
+}
+
+### データ読み込み
+data2006<- list()
+data2011<- list()
+
+data2006<- funcReadHuhyo(url2006,2006)
+data2011<- funcReadHuhyo(url2011,2011)
+
+for(i in 1:length(data2006$`2011`)){
+  temp01<- data2011$`2011`[[i]][data2011$`2011`[[i]]$地域 == "99_全県計",
+                                2:ncol(data2011$`2011`[[i]])] /
+    data2006$`2011`[[i]][data2006$`2011`[[i]]$地域 == "99_全県計",
+                         2:ncol(data2006$`2011`[[i]])]
+  temp02<- names(data2006$`2011`)[i]
+  temp<- c(temp02,unlist(temp01)) %>% matrix(nrow=1,ncol=length(temp01)+1) %>% as.data.frame()
+  if(i == 1){
+    defVec<- temp
+  }else{
+    defVec<- rbind(defVec,temp)
+  }
+}
+defVec01<- defVec[,1]
+defVec02<- apply(defVec[,2:ncol(defVec)],2,function(x){
+  x<- ifelse(x == "NaN" ,1,x)
+  x<- as.numeric(x)
+  x
+}) %>% as.data.frame()
+defVec<- cbind(defVec01,defVec02) %>% as.data.frame()
+colnames(defVec)<- colnames(data2006$`2011`[[1]])
+
+for(i in 1:(length(data2006)-1)){
+  for(j in 1:nrow(defVec)){
+    temp<- data2006[[i]][[j]]
+    for(k in 1:(ncol(temp)-1)){
+      temp[,(k+1)]<- temp[,(k+1)] * defVec[j,(k+1)]
+    }
+    data2006[[i]][[j]]<- temp
+  }
+}
+dataHuhyo<- list()
+for(i in 1:(length(data2011)+5)){
+  if(i <= 5){
+    dataHuhyo[[i]]<- data2006[[i]]
+  }else{
+    dataHuhyo[[i]]<- data2011[[i-5]]
+  }
+}
+names(dataHuhyo)<- 2006:(2006 + length(dataHuhyo) - 1)
+
+for(i in 1:length(dataHuhyo)){
+  for(j in 1:length(dataHuhyo[[i]])){
+    colnames(dataHuhyo[[i]][[j]])<- c("地域",
+                                      paste0(names(dataHuhyo[[i]][j]),"_",
+                                             colnames(dataHuhyo[[i]][[j]])[2:10]))
+    temp<- gather(dataHuhyo[[i]][[j]],key=系列名,value=値,-地域)
+    temp$区分<- "県内総生産および要素所得"
+    temp$名実<- "名目"
+    temp$年<- names(dataHuhyo)[i]
+    temp<- temp[,colnames(dummyTable)]
+    if(i == 1 & j == 1){
+      tempData<- temp
+    }else{
+      tempData<- rbind(tempData,temp)
+    }
+  }
+}
+DataBase<- rbind(DataBase,tempData)
 DataBase<- DataBase[!is.na(DataBase$値) & DataBase$値 != 0,]
 
 write.csv(DataBase,"DataBase.csv",fileEncoding = "Shift-Jis")
