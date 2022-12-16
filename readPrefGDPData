@@ -98,7 +98,7 @@ makeColName<- function(df_h){
   layerNo<- c(1,1,1,1,1)
   
   for(j in 2:ncol(df_h)){
-    tempI< 0
+    tempI<- 0
 
     for(i in 1:nrow(df_h)){
       tempI<- tempI + 1
@@ -159,6 +159,24 @@ readSheet<- function(fileName,SheetNo,Kubun){
   df
 }
 
+funcDef<- function(def2011,def2006){
+  for(i in 1:ncol(def2011)){
+    Narow2011<- !is.na(def2011[1:47,i])
+    Narow2006<- !is.na(def2006[1:47,i])
+    Narow<- Narow2011 * Narow2006
+    
+    tempDef<- sum(def2011[1:47,i] * Narow,na.rm=T) /
+      sum(def2006[1:47,i] * Narow,na.rm=T)
+    
+    if(i == 1){
+      defVec<- tempDef
+    }else{
+      defVec<- c(defVec,tempDef)
+    }
+  }
+  defVec
+}
+
 funcSer<- function(Path2006,Path2011,Kubun,Meijitsu){
   file2006<- loadWorkbook(Path2006)
   file2011<- loadWorkbook(Path2011)
@@ -172,11 +190,17 @@ funcSer<- function(Path2006,Path2011,Kubun,Meijitsu){
   for(i in 1:sheetNum2011){
     if(Kubun == "県内総支出"){
       temp<- readSheet(file2011,i,Kubun)
-      temp$`_民間最終消費支出_家計最終消費支出_その他`<- sum(temp$`_民間最終消費支出_家計最終消費支出_保険・金融サービス`,
-                     temp$`_民間最終消費支出_家計最終消費支出_個別ケア・社会保護・その他`,
-                     na.rm=T)
+      if(Meijitsu == "名目"){
+        temp$`01_民間最終消費支出_01_家計最終消費支出_99_その他`<- 
+          temp$`01_民間最終消費支出_01_家計最終消費支出_12_保険・金融サービス` +
+          temp$`01_民間最終消費支出_01_家計最終消費支出_13_個別ケア・社会保護・その他`
+      }else{
+        temp$`01_民間最終消費支出_01_家計最終消費支出_99_その他`<- 
+          temp$`01_民間最終消費支出アイダサイオワリ_01_家計最終消費支出ケイサイオワリ_12_保険・金融サービスキンユウ` +
+          temp$`01_民間最終消費支出アイダサイオワリ_01_家計最終消費支出ケイサイオワリ_13_個別ケア・社会保護・その他シャカイホゴタ`
+      }
       lis2011[[i+5]]<- temp[,c(colnames(temp[,1:14]),
-                               "_民間最終消費支出_家計最終消費支出_その他",
+                               "01_民間最終消費支出_01_家計最終消費支出_99_その他",
                                colnames(temp[,17:(ncol(temp)-1)]))]
     }else{
       lis2011[[i+5]]<- readSheet(file2011,i,Kubun)
@@ -195,20 +219,43 @@ funcSer<- function(Path2006,Path2011,Kubun,Meijitsu){
     }
   }
   
-  if(Kubun == "県内総支出" & Meijitsu == "実質"){
+  if(Kubun == "県内総支出"){
     for(i in 6:sheetNum2011){
       colnames(lis2011[[i]])<- tempname
     }
   }
   
-  def_mat<- lis2011[[6]][,2:ncol(lis2011[[6]])] /lis2006[[6]][,2:ncol(lis2006[[6]])]
+  defVec<- funcDef(lis2011[[6]][,2:ncol(lis2011[[6]])],
+                   lis2006[[6]][,2:ncol(lis2006[[6]])])
   
   for(i in 1:5){
-    lis2011[[i]]<- cbind(lis2006[[i]][,1],lis2006[[i]][,2:ncol(lis2006[[i]])] * def_mat)
-    colnames(lis2011[[i]])<- c("地域",colnames(lis2011[[i]][,2:ncol(lis2011[[i]])]))
+    temp<- apply(lis2006[[i]][,2:ncol(lis2006[[i]])],1,function(x){x * defVec}) %>%
+      t() %>% as.data.frame()
+    lis2011[[i]]<- cbind(lis2006[[i]][,1],temp)
+    colnames(lis2011[[i]])<- c("地域",colnames(lis2006[[i]][,2:ncol(lis2006[[i]])]))
+    if(Kubun == "県内総支出"){
+      if(Meijitsu == "名目"){
+        lis2011[[i]]$`04_財貨・サービスの移出入(純)･統計上の不突合_07_統計上の不突合`<-
+          lis2011[[i]]$`05_県内総生産（支出側）` -
+          (lis2011[[i]]$`01_民間最終消費支出` +
+             lis2011[[i]]$`02_地方政府等最終消費支出`+
+             lis2011[[i]]$`03_県内総資本形成`+
+             lis2011[[i]]$`04_財貨・サービスの移出入(純)･統計上の不突合_06_財貨・サービスの移出入（純）`)
+        lis2011[[i]]$`04_財貨・サービスの移出入(純)･統計上の不突合`<-
+          lis2011[[i]]$`04_財貨・サービスの移出入(純)･統計上の不突合_06_財貨・サービスの移出入（純）` +
+          lis2011[[i]]$`04_財貨・サービスの移出入(純)･統計上の不突合_07_統計上の不突合`
+      }else{
+        lis2011[[i]]$`04_財貨・サービスの移出入(純)･統計上の不突合・開差カイサ`<-
+          lis2011[[i]]$`05_県内総生産（支出側）ソウセイサンシシュツガワ` -
+          (lis2011[[i]]$`01_民間最終消費支出アイダサイオワリ`+
+             lis2011[[i]]$`02_地方政府等最終消費支出ナドサイオワリ`+
+             lis2011[[i]]$`03_県内総資本形成`)
+      }
+    }
   }
   
   for(i in 1:length(lis2011)){
+    colnames(lis2011[[i]])<- colnames(lis2011[[length(lis2011)]])
     if(i == 1){
       tempTable<- gather(lis2011[[i]],key=系列名,value=値,-地域)
       tempTable$年<- 2006
@@ -223,7 +270,14 @@ funcSer<- function(Path2006,Path2011,Kubun,Meijitsu){
   tempTable<- tempTable[,colnames(dummyTable)]
   
   if(Kubun == "県内総支出"){
-    tempTable$系列名<- str_remove_all(tempTable$系列名,"アイダサイオワリ|ケイサイオワリ")
+    tempTable$系列名<- str_remove_all(tempTable$系列名,
+                                   "アイダサイオワリ|ケイサイオワリ") %>%
+                       str_remove_all("カケイミンカン|ナドサイオワリ|アイダ|
+                                   アイダクワダギョウ|カイサ") %>%
+                       str_remove_all("コテイシホン|コヘンドウ|クワダギョウ") %>%
+                       str_remove_all("タク|ソウセイサンシシュツガワ") %>%
+                       str_remove_all("ギョウセツビ") %>%
+                       str_remove_all("マト")
   }
   
   tempTable
@@ -234,24 +288,38 @@ PathNomProd2006<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files
 PathNomProd2011<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2019/syuyo1.xlsx"
 
 NomProd<- funcSer(PathNomProd2006,PathNomProd2011,"県内総生産","名目")
+NomProd<- NomProd[NomProd$系列名 != "21_参考" &
+                    NomProd$系列名 != "21_参考_NA_01_第２次産業" &
+                    NomProd$系列名 != "21_参考_NA_02_第３次産業",]
+
 
 ###　県内総生産（実質）
 PathReaProd2006<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2018/syuyo2.xlsx"
 PathReaProd2011<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2019/syuyo2.xlsx"
 
 ReaProd<- funcSer(PathReaProd2006,PathReaProd2011,"県内総生産","実質")
+ReaProd<- ReaProd[ReaProd$系列名 != "21_開差" &
+                    ReaProd$系列名 != "22_参考" &
+                    ReaProd$系列名 != "22_参考_NA_01_第２次産業" &
+                    ReaProd$系列名 != "22_参考_NA_02_第３次産業",]
 
 ### 県民所得
 PathIncome2006<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2018/syuyo3.xlsx"
 PathIncome2011<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2019/syuyo3.xlsx"
 
 Income<- funcSer(PathIncome2006,PathIncome2011,"県民所得",NA)
+Income$系列名<- str_replace_all(Income$系列名,"09_参考","09_参考（県民総所得）")
 
 ### 県内総支出（名目）
 PathNomExp2006<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2018/syuyo4.xlsx"
 PathNomExp2011<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2019/syuyo4.xlsx"
 
 NomExp<- funcSer(PathNomExp2006,PathNomExp2011,"県内総支出","名目")
+NomExp<- NomExp[NomExp$系列名 != "01_民間最終消費支出_02_（再掲）家計最終消費支出" &
+                  NomExp$系列名 != "06_参考_NA_NA_07_県民総所得(市場価格表示)",]
+NomExp$系列名<- str_replace_all(NomExp$系列名,"01_民間最終消費支出_02_（再掲）家計最終消費支出_NA_01_持ち家の帰属家賃",
+                             "01_民間最終消費支出_02_（再掲）家計最終消費支出_持ち家の帰属家賃") %>%
+  str_replace_all("06_参考","06_参考（県外からの要素所得）")
 
 ### 県内総支出（実質）
 PathReaExp2006<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2018/syuyo5.xlsx"
@@ -260,4 +328,6 @@ PathReaExp2011<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/
 ReaExp<- funcSer(PathReaExp2006,PathReaExp2011,"県内総支出","実質")
 
 DataBase<- rbind(DataBase,NomProd,ReaProd,Income,NomExp,ReaExp)
+DataBase<- DataBase[!is.na(DataBase$値) & DataBase$値 != 0,]
+
 write.csv(DataBase,"DataBase.csv",fileEncoding = "Shift-Jis")
