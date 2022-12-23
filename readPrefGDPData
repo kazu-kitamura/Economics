@@ -54,7 +54,7 @@ funcPop<- function(df2006,df2011,itemName){
   tempTable$系列名<- itemName
   tempTable$区分<- "総括表"
   tempTable$名実<- NA
-
+  
   tempTable<- tempTable[,colnames(dummyTable)]
   tempTable
 }
@@ -100,7 +100,7 @@ makeColName<- function(df_h){
   
   for(j in 2:ncol(df_h)){
     tempI<- 0
-
+    
     for(i in 1:nrow(df_h)){
       tempI<- tempI + 1
       
@@ -178,6 +178,111 @@ funcDef<- function(def2011,def2006){
   defVec
 }
 
+funcNAdel<- function(lis,nen){
+  templis<- list()
+  if(nen == 2011){
+    datalis<- lis[6:length(lis)]
+  }else{
+    datalis<- lis
+  }
+  
+  for(l in 1:nrow(datalis[[1]])){
+    for(m in 1:length(datalis)){
+      if(m == 1){
+        tempmat<- datalis[[m]][l,]
+      }else{
+        tempmat<- rbind(tempmat,datalis[[m]][l,])
+      }
+    }
+    templis[[l]]<- tempmat
+  }
+  
+  for(l in 1:length(datalis)){
+    if(l == 1){
+      NAmat<- apply(datalis[[l]][,2:ncol(datalis[[l]])],2,function(x){
+        ifelse(is.na(x),0,1)
+      })
+    }else{
+      NAmat<- apply(datalis[[l]][,2:ncol(datalis[[l]])],2,function(x){
+        ifelse(is.na(x),0,1)
+      }) * NAmat
+    }
+  }
+  NAmat<- as.data.frame(NAmat)
+  NAmat$地域<- datalis[[1]]$地域
+  NAmat<- NAmat[,c("地域",colnames(NAmat[,1:(ncol(NAmat)-1)]))]
+  
+  for(l in 1:length(datalis)){
+    temp<- datalis[[l]][,2:ncol(datalis[[l]])] * NAmat[,2:ncol(NAmat)]
+    temp<- apply(temp,2,function(x){ifelse(is.na(x),0,x)}) %>%
+      as.data.frame()
+    temp02<- apply(temp,2,sum) %>% as.vector()
+    
+    if(l == 1){
+      MULmat<- matrix(temp02,nrow=1,ncol=length(temp02)) %>% as.data.frame()
+    }else{
+      MULmat<- rbind(MULmat,
+                     matrix(temp02,nrow=1,ncol=length(temp02)) %>% as.data.frame())
+    }
+  }
+  MULmat02<- MULmat / rbind(NA,MULmat[1:(nrow(MULmat)-1),])
+  
+  for(l in 1:length(templis)){
+    tempmat<- templis[[l]][,2:ncol(templis[[l]])]
+    for(m in nrow(MULmat02):2){
+      tempflag<- ifelse(is.na(tempmat[m,]),1,0)
+      
+      if(sum(tempflag) == 0){
+        next
+      }else{
+        tempMULMat<- apply(MULmat02[m,],2,function(x){ifelse(is.na(x),0,x)})
+        tempMUL<- tempflag * tempMULMat
+        tempRES<- tempMUL * tempmat[m-1,]
+        tempVEC<- apply(tempmat[m,],2,function(x){
+          ifelse(is.na(x),0,x)}) %>% t()
+        tempmat[m,]<- tempVEC + tempRES
+      }
+    }
+    for(m in 2:(nrow(MULmat02))){
+      tempflag<- ifelse(is.na(tempmat[m,]),1,0)
+      
+      if(sum(tempflag) == 0){
+        next
+      }else{
+        tempMULMat<- apply(MULmat02[m,],2,function(x){ifelse(is.na(x),0,x)})
+        tempMUL<- tempflag * tempMULMat
+        tempRES<- tempmat[m-1,] * tempMUL
+        tempVEC<- apply(tempmat[m,],2,function(x){
+          ifelse(is.na(x),0,x) %>% t()
+        })
+        tempmat[m,]<- tempVEC + tempRES
+      }
+    }
+    tempmat<- apply(tempmat,2,function(x){ifelse(is.na(x),0,x)})
+    templis[[l]][,2:ncol(templis[[l]])]<- tempmat
+  }
+  
+  datalis02<- list()
+  for(l in 1:length(templis)){
+    for(m in 1:nrow(templis[[l]])){
+      if(l == 1){
+        datalis02[[m]]<- templis[[l]][m,]
+      }else{
+        datalis02[[m]]<- rbind(datalis02[[m]],templis[[l]][m,])
+      }
+    }
+  }
+  lis02<-list()
+  for(l in 1:length(datalis02)){
+    if(nen == 2011){
+      lis02[[l+5]]<- datalis02[[l]]
+    }else{
+      lis02[[l]]<- datalis02[[l]]
+    }
+  }
+  lis02
+}
+
 funcSer<- function(Path2006,Path2011,Kubun,Meijitsu){
   file2006<- loadWorkbook(Path2006)
   file2011<- loadWorkbook(Path2011)
@@ -229,6 +334,11 @@ funcSer<- function(Path2006,Path2011,Kubun,Meijitsu){
   defVec<- funcDef(lis2011[[6]][,2:ncol(lis2011[[6]])],
                    lis2006[[6]][,2:ncol(lis2006[[6]])])
   
+  if(Kubun == "県内総生産"){
+    lis2011<- funcNAdel(lis2011,2011)
+    lis2006<- funcNAdel(lis2006,2006)
+  }
+
   for(i in 1:5){
     temp<- apply(lis2006[[i]][,2:ncol(lis2006[[i]])],1,function(x){x * defVec}) %>%
       t() %>% as.data.frame()
@@ -273,12 +383,12 @@ funcSer<- function(Path2006,Path2011,Kubun,Meijitsu){
   if(Kubun == "県内総支出"){
     tempTable$系列名<- str_remove_all(tempTable$系列名,
                                    "アイダサイオワリ|ケイサイオワリ") %>%
-                       str_remove_all("カケイミンカン|ナドサイオワリ|アイダ|
+      str_remove_all("カケイミンカン|ナドサイオワリ|アイダ|
                                    アイダクワダギョウ|カイサ") %>%
-                       str_remove_all("コテイシホン|コヘンドウ|クワダギョウ") %>%
-                       str_remove_all("タク|ソウセイサンシシュツガワ") %>%
-                       str_remove_all("ギョウセツビ") %>%
-                       str_remove_all("マト")
+      str_remove_all("コテイシホン|コヘンドウ|クワダギョウ") %>%
+      str_remove_all("タク|ソウセイサンシシュツガワ") %>%
+      str_remove_all("ギョウセツビ") %>%
+      str_remove_all("マト")
   }
   
   tempTable
@@ -498,6 +608,7 @@ for(i in 1:length(dataHuhyo)){
   }
 }
 DataBase<- rbind(DataBase,tempData)
-DataBase<- DataBase[!is.na(DataBase$値) & DataBase$値 != 0,]
+#DataBase<- DataBase[!is.na(DataBase$値) & DataBase$値 != 0,]
+DataBase<- DataBase[!is.na(DataBase$値),]
 
 write.csv(DataBase,"DataBase.csv",fileEncoding = "Shift-Jis")
