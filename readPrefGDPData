@@ -1,14 +1,15 @@
-library(openxlsx)
-library(tidyr)
+library(openxlsx)  # Excelファイルの取り扱い
+library(tidyr)     # データ整形
+library(dplyr)     # データ整形
+library(lubridate) # 日付データの取り扱い
+library(stringr)   # テキストの取り扱い
+library(rvest)     # HTMLの取り扱い
+
 gc();gc(reset=TRUE)
 print("gc done")
 rm(list=ls(all.names=TRUE))
 
-library(dplyr)
-library(lubridate)
-library(stringr)
-library(rvest)
-
+# 空のアウトプット用のロング型データの枠組み
 dummyTable<- data.frame(matrix(NA,ncol=6,nrow=1))
 colnames(dummyTable)<- c("区分","系列名","名実","地域","年","値")
 
@@ -17,6 +18,7 @@ colnames(dummyTable)<- c("区分","系列名","名実","地域","年","値")
 #################################
 
 ### 関数定義
+#### 2列目以降を数値型データへ変換する関数
 asNum<- function(df){
   for(i in 2:ncol(df)){
     df[,i]<- as.numeric(df[,i])
@@ -24,6 +26,7 @@ asNum<- function(df){
   df
 }
 
+#### 都道府県にコード番号を振る関数
 funcPrefCode<- function(df){
   for(i in 1:nrow(df)){
     if(i != nrow(df)){
@@ -35,27 +38,28 @@ funcPrefCode<- function(df){
   df
 }
 
+#### 2006年表と2011年表を重複する2011年でデフレートして接続する関数
 funcPop<- function(df2006,df2011,itemName){
   df2006_temp<- df2006[1:48,2:8] %>% asNum()
   df2006<- funcPrefCode(df2006_temp)
   df2011<- df2011[1:48,2:(ncol(df2011)-1)] %>% asNum()
   df2011<- funcPrefCode(df2011)
-  df_def<- df2011[,2] / df2006[,7]
+  df_def<- df2011[,2] / df2006[,7]     # 接続のための係数
   
   temp2006<- apply(df2006[,2:ncol(df2006)],2,function(x){x/df_def}) %>%
-    as.data.frame()
+    as.data.frame()                    # applyで係数を適用
   df2006<- cbind(df2006[,1],temp2006[,1:(ncol(temp2006)-1)])
   
   colnames(df2006)<- c("地域",colnames(df2006)[2:ncol(df2006)])
   colnames(df2011)<- c("地域",colnames(df2011)[2:ncol(df2011)])
-  df<- left_join(df2006,df2011,key=地域)
+  df<- left_join(df2006,df2011,key=地域)   # 2006年表と2011年表を接続
   
-  tempTable<- gather(df,key="年",value="値",2:ncol(df))
-  tempTable$系列名<- itemName
+  tempTable<- gather(df,key="年",value="値",2:ncol(df))   # ロング型に変換
+  tempTable$系列名<- itemName   # 足りない列を補う
   tempTable$区分<- "総括表"
   tempTable$名実<- NA
   
-  tempTable<- tempTable[,colnames(dummyTable)]
+  tempTable<- tempTable[,colnames(dummyTable)]   # 枠に合わせて列を並び替え
   tempTable
 }
 
@@ -94,47 +98,50 @@ DataBase<- rbind(Pop,Wor,Lab)
 #################################
 
 ###　関数定義
+#### 数行（数段）にバラバラに別れている項目名から列名を生成する関数
 makeColName<- function(df_h){
   header<- "地域"
-  layerNo<- c(1,1,1,1,1)
-  
-  for(j in 2:ncol(df_h)){
-    tempI<- 0
+  layerNo<- c(1,1,1,1,1)     # データが格納されている行数（段数）ごとに
+                             # 番号を積み増し、コードを振るためのフラグ
+  for(j in 2:ncol(df_h)){    # 列数のループ
+    tempI<- 0                # 現在の段数を記憶するダミー変数をリセット
     
-    for(i in 1:nrow(df_h)){
-      tempI<- tempI + 1
+    for(i in 1:nrow(df_h)){  # 行数のループ
+      tempI<- tempI + 1      # 段数（行数）に１を加える
       
       if(is.na(df_h[i,j]) | df_h[i,j] == "都道府県"){
-        df_h[i,j]<- df_h[i,j-1]
-      }else{
+        df_h[i,j]<- df_h[i,j-1]   # ターゲットセルが空白等なら左隣をコピー
+      }else{                      # 空白等でなければまずフラグを加える
         df_h[i,j]<- paste0(formatC(layerNo[i],width=2,flag=0),"_",df_h[i,j])
-        layerNo[i]<- layerNo[i] + 1
+        layerNo[i]<- layerNo[i] + 1   # フラグの当該レイヤーに１を加える
         
-        for(k in 1:i){
+        for(k in 1:i){            # 1行目から当該行までのループ
           if(k == 1){
-            tempName<- df_h[k,j]
+            tempName<- df_h[k,j]  # 1行のみならそのまま項目名に
           }else{
             tempName<- paste0(tempName,"_",df_h[k,j])
-          }
+          }                       # 複数行なら_でつないで項目名に
         }
-        header[j]<- tempName
+        header[j]<- tempName      # 列名ベクトルに結果を追加
         break
       }
     }
   }
-  header
+  header                          # 列名ベクトルを出力
 }
 
+#### 個々のシートを読み込むための関数
 readSheet<- function(fileName,SheetNo,Kubun){
   df<- read.xlsx(xlsxFile=fileName,sheet=SheetNo)
   
-  df_num<- match("北海道",df[,2])
-  df_val<- df[df_num:(df_num+47),2:(ncol(df)-1)] %>%
-    funcPrefCode()
+  df_num<- match("北海道",df[,2])                      # 「北海道」がある行を
+  df_val<- df[df_num:(df_num+47),2:(ncol(df)-1)] %>%   # データの開始点として
+    funcPrefCode()                                     # データ部分を読み込む
   
-  df_head<- df[2:(df_num-1),2:ncol(df)]
-  if(Kubun == "県民所得"){
-    for(i in 1:ncol(df_head)){
+  df_head<- df[2:(df_num-1),2:ncol(df)]                # データ部分より上を
+                                                       # 項目名として読み込む
+  if(Kubun == "県民所得"){                             # 県民所得の場合は余計
+    for(i in 1:ncol(df_head)){                         # な文字列を削除
       for(j in 1:nrow(df_head)){
         df_head[j,i]<- str_remove_all(df_head[j,i],"[ァ-ヴ]|
                                       (地方政府等)|
@@ -148,122 +155,128 @@ readSheet<- function(fileName,SheetNo,Kubun){
     }
   }
   
-  header<- makeColName(df_head)
-  header<- str_remove_all(header,"\n") %>%
-    str_remove_all("　")
-  header[grep("都道府県",header)]<- NA
+  header<- makeColName(df_head)               # 関数で列名を生成
+  header<- str_remove_all(header,"\n") %>%    # 改行記号を削除
+    str_remove_all("　")                      # スペースを削除
+  header[grep("都道府県",header)]<- NA        # 「都道府県」セルをNAに
   
-  colnames(df_val)<- header
-  df<- df_val[,!is.na(colnames(df_val))] %>% asNum() %>% as.data.frame()
-  colnames(df)<- c("地域",colnames(df[,2:ncol(df)]))
+  colnames(df_val)<- header                   # 生成した項目名を列名に
+  df<- df_val[,!is.na(colnames(df_val))] %>%
+    asNum() %>% as.data.frame()               # 2列目以降を数値型に
+  colnames(df)<- c("地域",colnames(df[,2:ncol(df)]))  # 最初の列名を「地域」に
   
   df
 }
 
+#### 2011年表と2006年表を接続するための2011年の値の比を求める関数
 funcDef<- function(def2011,def2006){
-  for(i in 1:ncol(def2011)){
-    Narow2011<- !is.na(def2011[1:47,i])
-    Narow2006<- !is.na(def2006[1:47,i])
-    Narow<- Narow2011 * Narow2006
+  for(i in 1:ncol(def2011)){              # 列のループ
+    Narow2011<- !is.na(def2011[1:47,i])   # 2011年表のNAの行を検知
+    Narow2006<- !is.na(def2006[1:47,i])   # 2006年表のNAの行を検知
+    Narow<- Narow2011 * Narow2006         # 双方を掛け合わせていずれかNAは０に
     
-    tempDef<- sum(def2011[1:47,i] * Narow,na.rm=T) /
-      sum(def2006[1:47,i] * Narow,na.rm=T)
-    
+    tempDef<- sum(def2011[1:47,i] * Narow,na.rm=T) /   # NA以外の各県の値を
+      sum(def2006[1:47,i] * Narow,na.rm=T)             # 各々、列ごとに足し
+                                                       # 合わせ両者の比をとる
     if(i == 1){
-      defVec<- tempDef
-    }else{
+      defVec<- tempDef                    # 結果を各列（項目）ごとの接続の
+    }else{                                # ための係数としてベクトルに保管
       defVec<- c(defVec,tempDef)
     }
   }
   defVec
 }
 
+#### 主に生産系列を念頭にNAを補完補正するための関数
 funcNAdel<- function(lis,nen){
-  templis<- list()
-  if(nen == 2011){
-    datalis<- lis[6:length(lis)]
+  if(nen == 2011){                # 2011年表の場合はリストの5つ目までは空
+    datalis<- lis[6:length(lis)]  # なので、6つ目以降を取り出す
   }else{
     datalis<- lis
   }
   
-  for(l in 1:nrow(datalis[[1]])){
-    for(m in 1:length(datalis)){
-      if(m == 1){
-        tempmat<- datalis[[m]][l,]
-      }else{
-        tempmat<- rbind(tempmat,datalis[[m]][l,])
-      }
-    }
-    templis[[l]]<- tempmat
+  templis<- list()                # 格納用のリスト
+  
+  for(l in 1:nrow(datalis[[1]])){      # 年別の47都道府県の表を
+    for(m in 1:length(datalis)){       # 都道府県別のすべての年が入った
+      if(m == 1){                      # リストに変換
+        tempmat<- datalis[[m]][l,]     # 最初のnrow(datalis[[○]])の
+      }else{                           # ○をlではなく数字にしなきゃいけない
+        tempmat<- rbind(tempmat,datalis[[m]][l,])  # のに気づかず、だいぶ
+      }                                            # ひっかかったｗ
+    }                                  # 考えてみれば当然だ、だってループの
+    templis[[l]]<- tempmat             # 最初にはlは未定義なんだからｗ
   }
   
-  for(l in 1:length(datalis)){
-    if(l == 1){
+  for(l in 1:length(datalis)){    # 各列（項目）のNAの位置を把握するループ
+    if(l == 1){                   # applyで列ごとにNAを把握、NAには０を振る
       NAmat<- apply(datalis[[l]][,2:ncol(datalis[[l]])],2,function(x){
         ifelse(is.na(x),0,1)
-      })
-    }else{
+      })                          # 2年目以降は掛け合わせ、いずれかの年に
+    }else{                        # NAがある位置には０を返す
       NAmat<- apply(datalis[[l]][,2:ncol(datalis[[l]])],2,function(x){
         ifelse(is.na(x),0,1)
       }) * NAmat
     }
   }
-  NAmat<- as.data.frame(NAmat)
-  NAmat$地域<- datalis[[1]]$地域
+  NAmat<- as.data.frame(NAmat)    # 地域の列と統合し、列を並び替え
+  NAmat$地域<- datalis[[1]]$地域  
   NAmat<- NAmat[,c("地域",colnames(NAmat[,1:(ncol(NAmat)-1)]))]
   
-  for(l in 1:length(datalis)){
+  for(l in 1:length(datalis)){    # 各年毎にNA位置を０とした行列をかける
     temp<- datalis[[l]][,2:ncol(datalis[[l]])] * NAmat[,2:ncol(NAmat)]
     temp<- apply(temp,2,function(x){ifelse(is.na(x),0,x)}) %>%
-      as.data.frame()
-    temp02<- apply(temp,2,sum) %>% as.vector()
+      as.data.frame()             # 各列（項目）ごとに計をとり、NAがある県
+    temp02<- apply(temp,2,sum) %>% as.vector()   # を除いた合計を求める
     
-    if(l == 1){
+    if(l == 1){                   # 各年ごとに求めたベクトルを時系列の行列に
       MULmat<- matrix(temp02,nrow=1,ncol=length(temp02)) %>% as.data.frame()
     }else{
       MULmat<- rbind(MULmat,
-                     matrix(temp02,nrow=1,ncol=length(temp02)) %>% as.data.frame())
+                     matrix(temp02,nrow=1,ncol=length(temp02)) %>%
+                       as.data.frame())
     }
-  }
+  }                               # 時系列の行列から各列・各年の伸び率をとる
   MULmat02<- MULmat / rbind(NA,MULmat[1:(nrow(MULmat)-1),])
   
-  for(l in 1:length(templis)){
+  for(l in 1:length(templis)){    # 各県ごとの行列のループ
     tempmat<- templis[[l]][,2:ncol(templis[[l]])]
-    for(m in nrow(MULmat02):2){
-      tempflag<- ifelse(is.na(tempmat[m,]),1,0)
+    for(m in nrow(MULmat02):2){   # まず下（新）の行から上（古）の行へのループ
+      tempflag<- ifelse(is.na(tempmat[m,]),1,0)   # 当該行（年）のNA有無を判定
       
-      if(sum(tempflag) == 0){
-        next
-      }else{
-        tempMULMat<- apply(MULmat02[m,],2,function(x){ifelse(is.na(x),0,x)})
-        tempMUL<- tempflag * tempMULMat
-        tempRES<- tempMUL * tempmat[m-1,]
-        tempVEC<- apply(tempmat[m,],2,function(x){
-          ifelse(is.na(x),0,x)}) %>% t()
-        tempmat[m,]<- tempVEC + tempRES
+      if(sum(tempflag) == 0){                     # その行（年）にNAがなければ
+        next                                      # 上（次の年）へ
+      }else{                                 # その行（年）にNAがあれば
+        tempMULMat<- apply(MULmat02[m,],2,   # 伸び率中、NAの位置を０に
+                           function(x){ifelse(is.na(x),0,x)})
+        tempMUL<- tempflag * tempMULMat      # 伸び率ベクトルとNAフラグをかけ
+        tempRES<- tempMUL * tempmat[m-1,]    # NAの位置だけ伸び率にして
+        tempVEC<- apply(tempmat[m,],2,       # 前年の数値をかけて推計値を出す
+                        function(x){ifelse(is.na(x),0,x)}) %>% t()
+        tempmat[m,]<- tempVEC + tempRES      # 上記を当該年のベクトルに足す
       }
     }
-    for(m in 2:(nrow(MULmat02))){
-      tempflag<- ifelse(is.na(tempmat[m,]),1,0)
+    for(m in 2:(nrow(MULmat02))){   # 次に上（古）から下（新）の行へのループ
+      tempflag<- ifelse(is.na(tempmat[m,]),1,0)   # 手順は上記に同じ
       
       if(sum(tempflag) == 0){
         next
       }else{
-        tempMULMat<- apply(MULmat02[m,],2,function(x){ifelse(is.na(x),0,x)})
+        tempMULMat<- apply(MULmat02[m,],2,
+                           function(x){ifelse(is.na(x),0,x)})
         tempMUL<- tempflag * tempMULMat
         tempRES<- tempmat[m-1,] * tempMUL
-        tempVEC<- apply(tempmat[m,],2,function(x){
-          ifelse(is.na(x),0,x) %>% t()
-        })
+        tempVEC<- apply(tempmat[m,],2,
+                        function(x){ifelse(is.na(x),0,x)}) %>% t()
         tempmat[m,]<- tempVEC + tempRES
       }
-    }
+    }           # それでも残るNAはしょうがないので０に置き換えてリストに格納
     tempmat<- apply(tempmat,2,function(x){ifelse(is.na(x),0,x)})
     templis[[l]][,2:ncol(templis[[l]])]<- tempmat
   }
   
-  datalis02<- list()
-  for(l in 1:length(templis)){
+  datalis02<- list()                   # 都道府県ごとのリストを年ごとの
+  for(l in 1:length(templis)){         # リストに戻す
     for(m in 1:nrow(templis[[l]])){
       if(l == 1){
         datalis02[[m]]<- templis[[l]][m,]
@@ -272,8 +285,8 @@ funcNAdel<- function(lis,nen){
       }
     }
   }
-  lis02<-list()
-  for(l in 1:length(datalis02)){
+  lis02<-list()                         # 2011年表は最初の5つが空なので
+  for(l in 1:length(datalis02)){        # 区分して返す
     if(nen == 2011){
       lis02[[l+5]]<- datalis02[[l]]
     }else{
@@ -283,24 +296,25 @@ funcNAdel<- function(lis,nen){
   lis02
 }
 
+#### ファイル全体を読み込むための関数
 funcSer<- function(Path2006,Path2011,Kubun,Meijitsu){
-  file2006<- loadWorkbook(Path2006)
-  file2011<- loadWorkbook(Path2011)
+  file2006<- loadWorkbook(Path2006)   # 2006年及び2011年を
+  file2011<- loadWorkbook(Path2011)   # ワークブック（ファイル）ごと読み込む
   
-  sheetNum2006<- file2006@.xData$sheet_names %>% length()
-  sheetNum2011<- file2011@.xData$sheet_names %>% length()
+  sheetNum2006<- file2006@.xData$sheet_names %>% length()   # 各々のシート数
+  sheetNum2011<- file2011@.xData$sheet_names %>% length()   # を取得
   
   lis2006<- list()
   lis2011<- list()
   
-  for(i in 1:sheetNum2011){
-    if(Kubun == "県内総支出"){
-      temp<- readSheet(file2011,i,Kubun)
-      if(Meijitsu == "名目"){
+  for(i in 1:sheetNum2011){                # 2011年表のシートごとのループ
+    if(Kubun == "県内総支出"){             # 支出系列の場合、2011年表では
+      temp<- readSheet(file2011,i,Kubun)   # 2006年表より消費内訳が細かい
+      if(Meijitsu == "名目"){              # ので、一部合算して揃える
         temp$`01_民間最終消費支出_01_家計最終消費支出_99_その他`<- 
           temp$`01_民間最終消費支出_01_家計最終消費支出_12_保険・金融サービス` +
           temp$`01_民間最終消費支出_01_家計最終消費支出_13_個別ケア・社会保護・その他`
-      }else{
+      }else{                               # 実質系列はフリガナ情報が残ってたり…
         temp$`01_民間最終消費支出_01_家計最終消費支出_99_その他`<- 
           temp$`01_民間最終消費支出アイダサイオワリ_01_家計最終消費支出ケイサイオワリ_12_保険・金融サービスキンユウ` +
           temp$`01_民間最終消費支出アイダサイオワリ_01_家計最終消費支出ケイサイオワリ_13_個別ケア・社会保護・その他シャカイホゴタ`
@@ -313,9 +327,9 @@ funcSer<- function(Path2006,Path2011,Kubun,Meijitsu){
     }
   }
   
-  for(i in 1:6){
-    if(Kubun == "県民所得" | Kubun == "県内総支出"){
-      lis2006[[i]]<- readSheet(file2006,i,Kubun)
+  for(i in 1:6){                                      # さらに分配系列は双方で
+    if(Kubun == "県民所得" | Kubun == "県内総支出"){  # 微妙に項目名が異なるの
+      lis2006[[i]]<- readSheet(file2006,i,Kubun)      # で2011年表に揃える
       if(i == 1){
         tempname<- colnames(lis2006[[i]])
       }
@@ -325,27 +339,29 @@ funcSer<- function(Path2006,Path2011,Kubun,Meijitsu){
     }
   }
   
-  if(Kubun == "県内総支出"){
-    for(i in 6:sheetNum2011){
+  if(Kubun == "県内総支出"){           # 上記で合算した関係で、支出系列の
+    for(i in 6:sheetNum2011){          # 2011年表の項目名を再整理 
       colnames(lis2011[[i]])<- tempname
     }
   }
+                      # 2011年表と2006年表を接続するための重複する2011年の
+  defVec<- funcDef(lis2011[[6]][,2:ncol(lis2011[[6]])],   # 数値の比を
+                   lis2006[[6]][,2:ncol(lis2006[[6]])])   # 求める
   
-  defVec<- funcDef(lis2011[[6]][,2:ncol(lis2011[[6]])],
-                   lis2006[[6]][,2:ncol(lis2006[[6]])])
-  
-  if(Kubun == "県内総生産"){
-    lis2011<- funcNAdel(lis2011,2011)
-    lis2006<- funcNAdel(lis2006,2006)
+  if(Kubun == "県内総生産"){               # 生産系列は一部産業の事業所数が
+    lis2011<- funcNAdel(lis2011,2011)      # 少ない等の理由でNAが多いため、
+    lis2006<- funcNAdel(lis2006,2006)      # 上記の関数で補完補正する
   }
-
-  for(i in 1:5){
+                                           # 2006年表の数値に上記の接続係数を
+  for(i in 1:5){                           # かけて2011年表の該当年に投入
     temp<- apply(lis2006[[i]][,2:ncol(lis2006[[i]])],1,function(x){x * defVec}) %>%
       t() %>% as.data.frame()
     lis2011[[i]]<- cbind(lis2006[[i]][,1],temp)
-    colnames(lis2011[[i]])<- c("地域",colnames(lis2006[[i]][,2:ncol(lis2006[[i]])]))
-    if(Kubun == "県内総支出"){
-      if(Meijitsu == "名目"){
+    colnames(lis2011[[i]])<- c("地域",     # 投入後に列名を再度、付与
+                               colnames(lis2006[[i]][,2:ncol(lis2006[[i]])]))
+                                      # 支出系列の場合、差引項目である純移出や
+    if(Kubun == "県内総支出"){        # 不突合は調整係数による接続では過大or
+      if(Meijitsu == "名目"){         # 過少になりがちなため、他との差引で再計算
         lis2011[[i]]$`04_財貨・サービスの移出入(純)･統計上の不突合_07_統計上の不突合`<-
           lis2011[[i]]$`05_県内総生産（支出側）` -
           (lis2011[[i]]$`01_民間最終消費支出` +
@@ -355,7 +371,7 @@ funcSer<- function(Path2006,Path2011,Kubun,Meijitsu){
         lis2011[[i]]$`04_財貨・サービスの移出入(純)･統計上の不突合`<-
           lis2011[[i]]$`04_財貨・サービスの移出入(純)･統計上の不突合_06_財貨・サービスの移出入（純）` +
           lis2011[[i]]$`04_財貨・サービスの移出入(純)･統計上の不突合_07_統計上の不突合`
-      }else{
+      }else{                           # 項目名が異なるので名目・実質を別々に
         lis2011[[i]]$`04_財貨・サービスの移出入(純)･統計上の不突合・開差カイサ`<-
           lis2011[[i]]$`05_県内総生産（支出側）ソウセイサンシシュツガワ` -
           (lis2011[[i]]$`01_民間最終消費支出アイダサイオワリ`+
@@ -365,9 +381,9 @@ funcSer<- function(Path2006,Path2011,Kubun,Meijitsu){
     }
   }
   
-  for(i in 1:length(lis2011)){
+  for(i in 1:length(lis2011)){             # 列名を再度、統一
     colnames(lis2011[[i]])<- colnames(lis2011[[length(lis2011)]])
-    if(i == 1){
+    if(i == 1){                            # ロング型に変形してストック
       tempTable<- gather(lis2011[[i]],key=系列名,value=値,-地域)
       tempTable$年<- 2006
     }else{
@@ -376,11 +392,11 @@ funcSer<- function(Path2006,Path2011,Kubun,Meijitsu){
       tempTable<- rbind(tempTable,temp)
     }
   }
-  tempTable$区分<- Kubun
+  tempTable$区分<- Kubun               # 足りないデータ項目を追加して並び替え
   tempTable$名実<- Meijitsu
   tempTable<- tempTable[,colnames(dummyTable)]
   
-  if(Kubun == "県内総支出"){
+  if(Kubun == "県内総支出"){           # 支出系列の余計なフリガナ情報を削除
     tempTable$系列名<- str_remove_all(tempTable$系列名,
                                    "アイダサイオワリ|ケイサイオワリ") %>%
       str_remove_all("カケイミンカン|ナドサイオワリ|アイダ|
@@ -444,20 +460,20 @@ DataBase<- rbind(DataBase,NomProd,ReaProd,Income,NomExp,ReaExp)
 ###　付表
 #################################
 
-###　URL取得
+###　URL取得（要素所得の付表は年毎にファイルが追加されるため、URLから取得）
 html2006<- read_html("https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/main_2018.html") %>%
-  html_nodes("a") %>% html_attr("href")
-html2006<- html2006[str_detect(html2006,"huhyo") == T]
-for(i in length(html2006):(length(html2006)-5)){
+  html_nodes("a") %>% html_attr("href")                 # HTMLを読んでURLを取得
+html2006<- html2006[str_detect(html2006,"huhyo") == T]  # 「huhyo」で抽出
+for(i in length(html2006):(length(html2006)-5)){        
   temp<- paste0("https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/",
-                html2006[i])
-  if(i == length(html2006)){
+                html2006[i])             # 文字列統合してURLに
+  if(i == length(html2006)){             # ベクトルにストックしていく
     url2006<- temp
   }else{
     url2006<- c(url2006,temp)
   }
 }
-
+                                         # 2011年表も上記同様の手順でURL取得
 html2011<- read_html("https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/main_2019.html") %>%
   html_nodes("a") %>% html_attr("href")
 html2011<- html2011[str_detect(html2011,"huhyo") == T]
@@ -472,16 +488,17 @@ for(i in length(html2011):1){
 }
 
 ###　関数定義
+#### 付表を読み込む関数
 funcReadHuhyo<- function(urlvec,startyear){
   filelist<- list()
   datalist<- list()
   
-  for(i in 1:length(urlvec)){
-    filelist[[i]]<- loadWorkbook(urlvec[i])
-    
-    tempName<- filelist[[i]]@.xData$sheet_names
-    tempName<- tempName[str_detect(tempName,"（１）") ==T|
-                          str_detect(tempName,"（２）") ==T|
+  for(i in 1:length(urlvec)){                  # 各URL（年）ごとのループ
+    filelist[[i]]<- loadWorkbook(urlvec[i])    # 各年の付表ファイルを読み込む
+                                               # シート名を取得し、製造業中分類
+    tempName<- filelist[[i]]@.xData$sheet_names          # 以外のシート名を取得
+    tempName<- tempName[str_detect(tempName,"（１）") ==T|  # （中分類は分配の
+                          str_detect(tempName,"（２）") ==T|  # 情報がない）
                           str_detect(tempName,"（３）") ==T|
                           str_detect(tempName,"（４）") ==T|
                           str_detect(tempName,"（５）") ==T|
@@ -497,10 +514,11 @@ funcReadHuhyo<- function(urlvec,startyear){
                           str_detect(tempName,"（１５）") ==T|
                           str_detect(tempName,"（１６）") ==T|
                           str_detect(tempName,"合計") ==T]
+    
     listname<- str_replace_all(tempName,"（１）","01_") %>%
-      str_replace_all("（２）","02_") %>%
-      str_replace_all("（３）","03_") %>%
-      str_replace_all("（４）","04_") %>%
+      str_replace_all("（２）","02_") %>%     # シート名から産業名のみを抽出し
+      str_replace_all("（３）","03_") %>%     # コードを冒頭に振って
+      str_replace_all("（４）","04_") %>%     # 項目名としてストックしていく
       str_replace_all("（５）","05_") %>%
       str_replace_all("（６）","06_") %>%
       str_replace_all("（７）","07_") %>%
@@ -514,19 +532,22 @@ funcReadHuhyo<- function(urlvec,startyear){
       str_replace_all("（１５）","15_") %>%
       str_replace_all("（１６）","16_") %>%
       str_replace_all("合計","99_合計")
+    
     datalist[[i]]<- list()
-    for(j in 1:length(tempName)){
+    for(j in 1:length(tempName)){          # 各シート（産業）ごとのループ
       temp<- read.xlsx(xlsxFile = filelist[[i]],sheet = tempName[j])
-      StartRow<- match("北海道",temp[,2])
-      temp<- temp[StartRow:(StartRow + 47),2:11]
-      temp01<- temp[,1] %>% as.data.frame()
-      for(k in 1:nrow(temp01)){
-        if(k != nrow(temp01)){
+      StartRow<- match("北海道",temp[,2])         # 「北海道」をデータの
+      temp<- temp[StartRow:(StartRow + 47),2:11]  # 開始行として検索
+      temp01<- temp[,1] %>% as.data.frame()       # データ部分のみを切り離す
+      
+      for(k in 1:nrow(temp01)){                   # 都道府県順にコードを
+        if(k != nrow(temp01)){                    # 振るためのループ
           temp01[k,]<- paste0(formatC(k,width=2,flag=0),"_",temp01[k,])
         }else{
           temp01[k,]<- paste0("99_",temp01[k,])
         }
       }
+                                          # 2列名以降を数値型に変換、列名を振る
       temp02<- apply(temp[,2:ncol(temp)],2,as.numeric) %>% as.data.frame()
       temp<- cbind(temp01,temp02)
       colnames(temp)<- c("地域","01_産出額","02_中間投入","03_県内総生産",
@@ -536,8 +557,8 @@ funcReadHuhyo<- function(urlvec,startyear){
                          "07_県内要素所得_02_営業余剰・混合所得")
       datalist[[i]][[j]]<- temp
     }
-    names(datalist[[i]])<- listname
-  }
+    names(datalist[[i]])<- listname       # シートごとに産業名を付与
+  }                                       # リストごとに年度名を付与
   names(datalist)<- c(startyear:(startyear + length(datalist) - 1))
   datalist
 }
@@ -546,16 +567,20 @@ funcReadHuhyo<- function(urlvec,startyear){
 data2006<- list()
 data2011<- list()
 
-data2006<- funcReadHuhyo(url2006,2006)
-data2011<- funcReadHuhyo(url2011,2011)
+data2006<- funcReadHuhyo(url2006,2006)   # 2006年表の読み込み
+data2011<- funcReadHuhyo(url2011,2011)   # 2011年表の読み込み
 
-for(i in 1:length(data2006$`2011`)){
+for(i in 1:length(data2006$`2011`)){     # 2006年表は超複する2011年の数値比
+                                         # で調整後の数値を2011年表に投入
+  
+                                         # 2011年の比で調整係数を求める
   temp01<- data2011$`2011`[[i]][data2011$`2011`[[i]]$地域 == "99_全県計",
                                 2:ncol(data2011$`2011`[[i]])] /
     data2006$`2011`[[i]][data2006$`2011`[[i]]$地域 == "99_全県計",
                          2:ncol(data2006$`2011`[[i]])]
   temp02<- names(data2006$`2011`)[i]
-  temp<- c(temp02,unlist(temp01)) %>% matrix(nrow=1,ncol=length(temp01)+1) %>% as.data.frame()
+  temp<- c(temp02,unlist(temp01)) %>% 
+    matrix(nrow=1,ncol=length(temp01)+1) %>% as.data.frame()
   if(i == 1){
     defVec<- temp
   }else{
@@ -563,7 +588,7 @@ for(i in 1:length(data2006$`2011`)){
   }
 }
 defVec01<- defVec[,1]
-defVec02<- apply(defVec[,2:ncol(defVec)],2,function(x){
+defVec02<- apply(defVec[,2:ncol(defVec)],2,function(x){  # 計算不可は１に
   x<- ifelse(x == "NaN" ,1,x)
   x<- as.numeric(x)
   x
@@ -571,8 +596,8 @@ defVec02<- apply(defVec[,2:ncol(defVec)],2,function(x){
 defVec<- cbind(defVec01,defVec02) %>% as.data.frame()
 colnames(defVec)<- colnames(data2006$`2011`[[1]])
 
-for(i in 1:(length(data2006)-1)){
-  for(j in 1:nrow(defVec)){
+for(i in 1:(length(data2006)-1)){    # 各年・各産業ごとに各県の数値に
+  for(j in 1:nrow(defVec)){          # 調整係数をかけて接続する数値を算出
     temp<- data2006[[i]][[j]]
     for(k in 1:(ncol(temp)-1)){
       temp[,(k+1)]<- temp[,(k+1)] * defVec[j,(k+1)]
@@ -580,7 +605,7 @@ for(i in 1:(length(data2006)-1)){
     data2006[[i]][[j]]<- temp
   }
 }
-dataHuhyo<- list()
+dataHuhyo<- list()             # 2006年表と2011年表をまとめて一つのリストに
 for(i in 1:(length(data2011)+5)){
   if(i <= 5){
     dataHuhyo[[i]]<- data2006[[i]]
@@ -590,8 +615,8 @@ for(i in 1:(length(data2011)+5)){
 }
 names(dataHuhyo)<- 2006:(2006 + length(dataHuhyo) - 1)
 
-for(i in 1:length(dataHuhyo)){
-  for(j in 1:length(dataHuhyo[[i]])){
+for(i in 1:length(dataHuhyo)){                # 各テーブルをロングに展開
+  for(j in 1:length(dataHuhyo[[i]])){         # ストックしていく
     colnames(dataHuhyo[[i]][[j]])<- c("地域",
                                       paste0(names(dataHuhyo[[i]][j]),"_",
                                              colnames(dataHuhyo[[i]][[j]])[2:10]))
@@ -608,7 +633,6 @@ for(i in 1:length(dataHuhyo)){
   }
 }
 DataBase<- rbind(DataBase,tempData)
-#DataBase<- DataBase[!is.na(DataBase$値) & DataBase$値 != 0,]
 DataBase<- DataBase[!is.na(DataBase$値),]
 
 write.csv(DataBase,"DataBase.csv",fileEncoding = "Shift-Jis")
