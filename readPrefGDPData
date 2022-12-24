@@ -391,7 +391,8 @@ funcSer<- function(Path2006,Path2011,Kubun,Meijitsu){
       }else{                           # 項目名が異なるので名目・実質を別々に
         tempProd<- ReaProd[ReaProd$系列名 == "20_県内総生産" &
                              ReaProd$名実 == "実質" &
-                             ReaProd$年 == i + 2005,]
+                             ReaProd$年 == i + 2005,] %>%
+          spread(key=系列名,value=値)
         tempProd<- tempProd[order(tempProd$地域),]
         
         lis2011[[i]]$`05_県内総生産（支出側）ソウセイサンシシュツガワ`<- 
