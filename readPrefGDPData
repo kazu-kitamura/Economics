@@ -368,7 +368,7 @@ funcSer<- function(Path2006,Path2011,Kubun,Meijitsu){
           spread(key=系列名,value=値)
         tempProd<- tempProd[order(tempProd$地域),]
         
-        lis2011[[i]]$`05_県内総生産（支出側）`<- tempProd$値
+        lis2011[[i]]$`05_県内総生産（支出側）`<- tempProd$`20_県内総生産`
         
         tempbefore<- lis2011[[i]][lis2011[[i]]$地域 == "99_全県計",]$`04_財貨・サービスの移出入(純)･統計上の不突合`
         tempafter<- lis2011[[i]][lis2011[[i]]$地域 == "99_全県計",]$`05_県内総生産（支出側）` -
@@ -395,7 +395,7 @@ funcSer<- function(Path2006,Path2011,Kubun,Meijitsu){
         tempProd<- tempProd[order(tempProd$地域),]
         
         lis2011[[i]]$`05_県内総生産（支出側）ソウセイサンシシュツガワ`<- 
-          tempProd$値
+          tempProd$`20_県内総生産`
         
         lis2011[[i]]$`04_財貨・サービスの移出入(純)･統計上の不突合・開差カイサ`<-
           lis2011[[i]]$`05_県内総生産（支出側）ソウセイサンシシュツガワ` -
@@ -437,7 +437,7 @@ funcSer<- function(Path2006,Path2011,Kubun,Meijitsu){
   for(i in 1:length(lis2011)){              # 全県計を調整後の数字から再推計
     temp<- apply(lis2011[[i]][lis2011[[i]]$地域 != "99_全県計",
                               2:ncol(lis2011[[i]])],
-                 2,sum) %>% as.matrix() %>% t()
+                 2,sum) %>% as.vector()
     lis2011[[i]][lis2011[[i]]$地域 == "99_全県計",
                  2:ncol(lis2011[[i]])]<- temp
   }
