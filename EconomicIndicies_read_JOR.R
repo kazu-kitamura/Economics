@@ -15,13 +15,16 @@ library(lubridate)
 
 geturl2<- read_html("https://www.e-stat.go.jp/stat-search/files?page=1&toukei=00450222&tstat=000001020327") %>%
   html_nodes("a")
-geturl2<- geturl2[which(str_detect(geturl2,"月次")==T)[1]] %>%
+geturl2<- geturl2[which(str_detect(
+  as.character(geturl2),"月次")==T)[1]] %>%
   html_attr("href")
 geturl2<- paste0("https://www.e-stat.go.jp",geturl2)
 
 thtml<- read_html(geturl2) %>%
   html_nodes("a")
-url<- thtml[which(str_detect(thtml,"労働市場関係指標（求人倍率・就職率・充足率・求人数・求職者数・就職件数）")) + 1] %>%
+url<- thtml[which(str_detect(
+  as.character(thtml),
+  "労働市場関係指標（求人倍率・就職率・充足率・求人数・求職者数・就職件数）")) + 1] %>%
   html_attr("href")
 url<- paste0("https://www.e-stat.go.jp",url)
 fileName<- "第1表.xlsx"
