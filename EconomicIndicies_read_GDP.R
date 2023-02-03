@@ -8,7 +8,7 @@ library(stringr)
 gdp_h<- read_html("https://www.esri.cao.go.jp/jp/sna/sokuhou/sokuhou_top.html") %>%
   html_nodes("a")
 
-gdp_h2<- gdp_h[which(str_detect(gdp_h,"最新")==T)]
+gdp_h2<- gdp_h[which(str_detect(as.character(gdp_h),"最新")==T)]
 gdp_url<- paste0("https://www.esri.cao.go.jp/",html_attr(gdp_h2,"href"))
 
 # 掲載ページから必要なファイルの名称及びパスを取得
@@ -22,9 +22,11 @@ searchText<- c("名目原系列（CSV形式：",
 # 読み込みファイル分のパスを生成
 for(i in 1:length(searchText)){
   if(i == 1){
-    gdp_late_h2<- gdp_late_h[which(str_detect(gdp_late_h,searchText[i]))]
+    gdp_late_h2<- gdp_late_h[which(
+      str_detect(as.character(gdp_late_h),searchText[i]))]
   }else{
-    temp<- gdp_late_h[which(str_detect(gdp_late_h,searchText[i]))]
+    temp<- gdp_late_h[which(
+      str_detect(as.character(gdp_late_h),searchText[i]))]
     gdp_late_h2<- c(gdp_late_h2,temp)
   }
 }
@@ -40,7 +42,8 @@ for(i in 1:length(gdp_late_h2)){
   # csvを読み込み
   temp<- read.csv(paste0(str_remove(gdp_url,"gdemenuja.html"),
                          fileN),
-                  header=F)
+                  header=F,
+                  fileEncoding = "cp932")
   
   # データの1行目を抽出し、データ部分を分割
   headLine<- which(str_detect(temp[,1],"1994/ 1- 3.")) - 1
@@ -91,8 +94,8 @@ for(i in 1:length(gdp_late_h2)){
     
     # リスト名に系列名を設定
     list_name[i]<- paste0("GDP_",tempHead[1,1])
-  
-  # 消費支出内訳の場合
+    
+    # 消費支出内訳の場合
   }else if(str_detect(fileN,"kgaku")==T){
     # 項目名を抽出
     for(j in 1:ncol(temp)){
@@ -122,8 +125,8 @@ for(i in 1:length(gdp_late_h2)){
     
     # リスト名に系列名を設定
     list_name[i]<- paste0("家計消費_",tempHead[1,1])
-  
-  # 雇用者報酬の場合  
+    
+    # 雇用者報酬の場合  
   }else{
     tempBody<- tempBody[,c(2,4,6,8)]
     
@@ -178,8 +181,8 @@ for(i in 1:length(gdp_list)){
     }else{
       temp$div03<- "季節調整系列"
     }
-  
-  # 雇用者報酬の場合
+    
+    # 雇用者報酬の場合
   }else{
     temp$div01<- "雇用者報酬"
     temp$div02<- ifelse(str_detect(temp$item,"名目")==T,"名目","実質")
@@ -189,7 +192,6 @@ for(i in 1:length(gdp_list)){
   
   # 所得収支について別区分に
   temp$div01<- ifelse(temp$item == "要素所得純受取","GDP参考",temp$div01)
-  
   # データを統合
   if(i == 1){
     df<- temp
@@ -199,3 +201,4 @@ for(i in 1:length(gdp_list)){
 }
 df<- df[,c("div01","div02","div03","item","date","value")]
 df
+
