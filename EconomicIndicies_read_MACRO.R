@@ -1,4 +1,3 @@
-#マクロ経済指標をロング型データで取得するためのスクリプト
 library(dplyr)
 library(tidyr)
 library(rvest)
@@ -8,12 +7,14 @@ library(curl)
 library(lubridate)
 
 # 消費者物価指数
-CPtarget<- "https://www.e-stat.go.jp/stat-search/file-download?statInfId=000031431696&fileKind=1"
+CPtarget<- "https://www.e-stat.go.jp/stat-search/file-download?statInfId=000032103842&fileKind=1"
 
 temp<- curl_download(CPtarget,"temp.csv")
 
-temp<- read.csv("temp.csv")
-CP<- temp[6:nrow(temp),c(1,2,ncol(temp))]
+temp<- read.csv("temp.csv",fileEncoding = "cp932")
+CP<- temp[6:nrow(temp),c(1, 
+                         which(colnames(temp)=="総合"),
+                         which(colnames(temp)=="生鮮食品及びエネルギーを除く総合"))]
 colnames(CP)<- c("period","消費者物価総合","消費者物価_生鮮食品・エネルギー除く")
 CP$period<- paste0(CP$period,"01") %>% ymd()
 
