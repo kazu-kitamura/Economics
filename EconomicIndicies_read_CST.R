@@ -68,8 +68,8 @@ for(i in 1:length(fileName)){
         df<- rbind(df,temp2)
       }
     }
-  
-  # コンビニの場合  
+    
+    # コンビニの場合  
   }else if(str_detect(fileName[i],"41j")==T){
     # ファイルの読み込み
     temp<- read_excel(str_remove(fileName[i],"excel/"),
@@ -97,7 +97,7 @@ for(i in 1:length(fileName)){
     # 百貨店・スーパーと統合
     df<- rbind(df,temp2)
     
-  # 量販店の場合
+    # 量販店の場合
   }else if(str_detect(fileName[i],"42j")==T){
     # ファイルの読み込み
     temp<- read_excel(str_remove(fileName[i],"excel/"),
@@ -105,6 +105,18 @@ for(i in 1:length(fileName)){
                       skip=5)
     temp<- temp[2:nrow(temp),2:(ncol(temp)-3)] %>% as.data.frame()
     colnames(temp)<- c("date","合計",colnames(temp)[3:ncol(temp)])
+    temp$date<- ymd(paste0(temp$date,"1日"))
+    
+    # 必要な列に絞り込み
+    temp<- temp[,c("date",
+                   "合計",
+                   "ＡＶ家電",
+                   "情報家電",
+                   "通信家電",
+                   "カメラ類",
+                   "生活家電",
+                   "その他...17")]
+    colnames(temp)<- c(colnames(temp)[1:(ncol(temp)-1)],"その他")
     temp$date<- ymd(paste0(temp$date,"1日"))
     
     # ロング型に展開
@@ -117,7 +129,7 @@ for(i in 1:length(fileName)){
     # データを統合
     df<- rbind(df,temp2)
     
-  # ドラッグストアの場合
+    # ドラッグストアの場合
   }else if(str_detect(fileName[i],"43j")==T){
     # ファイルの読み込み
     temp<- read_excel(str_remove(fileName[i],"excel/"),
@@ -136,8 +148,8 @@ for(i in 1:length(fileName)){
     
     # データを統合
     df<- rbind(df,temp2)
-  
-  # ホームセンターの場合
+    
+    # ホームセンターの場合
   }else{
     # ファイルを読み込み
     temp<- read_excel(str_remove(fileName[i],"excel/"),
@@ -157,6 +169,11 @@ for(i in 1:length(fileName)){
     # データを統合
     df<- rbind(df,temp2)
   }
+}
+
+# 整列・出力
+df<- df[,c("div01","item","date","value")]
+df
 }
 
 # 整列・出力
