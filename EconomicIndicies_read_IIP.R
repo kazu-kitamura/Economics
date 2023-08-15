@@ -1,4 +1,3 @@
-#鉱工業生産指数をロング型データで取得するためのスクリプト
 library(dplyr)
 library(tidyr)
 library(rvest)
@@ -8,10 +7,10 @@ library(curl)
 
 # ファイル数・シート数が多いため、ループ処理
 motherUrl<- "https://www.meti.go.jp/statistics/tyo/iip/xls/"
-fileName<- c("b2015_gom1j.xlsx",
-             "b2015_gsm1j.xlsx",
-             "b2015_zom1j.xlsx",
-             "b2015_zsm1j.xlsx")
+fileName<- c("b2020_gom1j.xlsx",
+             "b2020_gsm1j.xlsx",
+             "b2020_zom1j.xlsx",
+             "b2020_zsm1j.xlsx")
 sheetName<- c("生産","出荷","在庫")
 
 # ファイルごとのループ
@@ -31,8 +30,8 @@ for(i in 1:length(fileName)){
     colnames(temp)<- ifelse(str_detect(colnames(temp),".ウエイト")==T,"100001",colnames(temp))
     
     # 業種別の場合
-    if(fileName[i] == "b2015_gom1j.xlsx" |
-       fileName[i] == "b2015_gsm1j.xlsx"){
+    if(fileName[i] == "b2020_gom1j.xlsx" |
+       fileName[i] == "b2020_gsm1j.xlsx"){
       temp$div01<- "業種別"
       temp<- temp[1:146,]
       
@@ -67,8 +66,8 @@ for(i in 1:length(fileName)){
                                    "生産財"),] %>% as.data.frame()
     }
     # ファイル名で原指数・季節調整指数を判別してデータを付加
-    if(fileName[i] == "b2015_gom1j.xlsx" |
-       fileName[i] == "b2015_zom1j.xlsx"){
+    if(fileName[i] == "b2020_gom1j.xlsx" |
+       fileName[i] == "b2020_zom1j.xlsx"){
       temp$div02<- "原系列"
     }else{
       temp$div02<- "季節調整系列"
