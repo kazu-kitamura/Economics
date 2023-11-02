@@ -52,7 +52,8 @@ funcPop<- function(df2006,df2011,itemName){
   
   colnames(df2006)<- c("地域",colnames(df2006)[2:ncol(df2006)])
   colnames(df2011)<- c("地域",colnames(df2011)[2:ncol(df2011)])
-  df<- left_join(df2006,df2011,key=地域)   # 2006年表と2011年表を接続
+#  df<- left_join(df2006,df2011,key=地域)   # 2006年表と2011年表を接続
+  df<- cbind(df2006,df2011[,2:ncol(df2011)])
   
   tempTable<- gather(df,key="年",value="値",2:ncol(df))   # ロング型に変換
   tempTable$系列名<- itemName   # 足りない列を補う
@@ -67,13 +68,13 @@ funcPop<- function(df2006,df2011,itemName){
 Pop2006<- read.xlsx("https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2018/soukatu9.xlsx",
                     startRow = 5,
                     sheet = 1)
-Pop2011<- read.xlsx("https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2019/soukatu9.xlsx",
+Pop2011<- read.xlsx("https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2020/soukatu9.xlsx",
                     startRow = 5,
                     sheet = 1)
 Pop<- funcPop(Pop2006,Pop2011,"総人口")
 
 ###　県内ベース（経済活動地ベース）の就業者数
-Wor2011<- read.xlsx("https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2019/soukatu10.xlsx",
+Wor2011<- read.xlsx("https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2020/soukatu10.xlsx",
                     startRow = 5,
                     sheet = 1)
 Wor2006<- read.xlsx("https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2018/soukatu10.xlsx",
@@ -82,7 +83,7 @@ Wor2006<- read.xlsx("https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/fil
 Wor<- funcPop(Wor2006,Wor2011,"県内就業者数")
 
 ###　県民ベース（居住地ベース）の雇用者数
-Lab2011<- read.xlsx("https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2019/soukatu11.xlsx",
+Lab2011<- read.xlsx("https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2020/soukatu11.xlsx",
                     startRow = 5,
                     sheet = 1)
 Lab2006<- read.xlsx("https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2018/soukatu11.xlsx",
@@ -481,7 +482,7 @@ funcSer<- function(Path2006,Path2011,Kubun,Meijitsu){
 
 ###　県内総生産（名目）
 PathNomProd2006<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2018/syuyo1.xlsx"
-PathNomProd2011<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2019/syuyo1.xlsx"
+PathNomProd2011<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2020/syuyo1.xlsx"
 
 NomProd<- funcSer(PathNomProd2006,PathNomProd2011,"県内総生産","名目")
 NomProd<- NomProd[NomProd$系列名 != "21_参考" &
@@ -491,7 +492,7 @@ NomProd<- NomProd[NomProd$系列名 != "21_参考" &
 
 ###　県内総生産（実質）
 PathReaProd2006<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2018/syuyo2.xlsx"
-PathReaProd2011<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2019/syuyo2.xlsx"
+PathReaProd2011<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2020/syuyo2.xlsx"
 
 ReaProd<- funcSer(PathReaProd2006,PathReaProd2011,"県内総生産","実質")
 ReaProd<- ReaProd[ReaProd$系列名 != "21_開差" &
@@ -501,14 +502,14 @@ ReaProd<- ReaProd[ReaProd$系列名 != "21_開差" &
 
 ### 県民所得
 PathIncome2006<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2018/syuyo3.xlsx"
-PathIncome2011<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2019/syuyo3.xlsx"
+PathIncome2011<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2020/syuyo3.xlsx"
 
 Income<- funcSer(PathIncome2006,PathIncome2011,"県民所得",NA)
 Income$系列名<- str_replace_all(Income$系列名,"09_参考","09_参考（県民総所得）")
 
 ### 県内総支出（名目）
 PathNomExp2006<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2018/syuyo4.xlsx"
-PathNomExp2011<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2019/syuyo4.xlsx"
+PathNomExp2011<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2020/syuyo4.xlsx"
 
 NomExp<- funcSer(PathNomExp2006,PathNomExp2011,"県内総支出","名目")
 NomExp<- NomExp[NomExp$系列名 != "01_民間最終消費支出_02_（再掲）家計最終消費支出" &
@@ -519,7 +520,7 @@ NomExp$系列名<- str_replace_all(NomExp$系列名,"01_民間最終消費支出
 
 ### 県内総支出（実質）
 PathReaExp2006<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2018/syuyo5.xlsx"
-PathReaExp2011<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2019/syuyo5.xlsx"
+PathReaExp2011<- "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2020/syuyo5.xlsx"
 
 ReaExp<- funcSer(PathReaExp2006,PathReaExp2011,"県内総支出","実質")
 
@@ -543,7 +544,7 @@ for(i in length(html2006):(length(html2006)-5)){
   }
 }
                                          # 2011年表も上記同様の手順でURL取得
-html2011<- read_html("https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/main_2019.html") %>%
+html2011<- read_html("https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/main_2020.html") %>%
   html_nodes("a") %>% html_attr("href")
 html2011<- html2011[str_detect(html2011,"huhyo") == T]
 for(i in length(html2011):1){
