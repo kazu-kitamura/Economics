@@ -1,0 +1,149 @@
+# リセット
+rm(list=ls(all.names = TRUE))
+
+# 必要なパッケージの読み込み
+library(readxl) # Excel
+library(dplyr)
+library(tidyr)
+library(curl) # ファイルダウンロード
+library(stringi) # 文字列操作
+library(stringr)
+library(rvest) # Webスクレイピング
+
+# 個別ファイルの読み込み関数
+ReadSheet<- function(url,year){
+  # ファイルのダウンロード及び解凍
+  curl_download(url,"temp.zip")
+  exfile<- unzip("temp.zip")
+  
+  file.remove("temp.zip")
+  
+  # 対象とするシート名（銀行単体のみ）の取得
+  sheetNames<- excel_sheets(exfile)
+  sheetNames<- sheetNames[grep("単体",sheetNames)]
+  sheetNames<- sheetNames[grep("銀行",sheetNames)]
+  
+  #シート名分のループ
+  for(i in 1:length(sheetNames)){
+    # シートの読み込み
+    tempdf<- read_excel(exfile,
+                        sheet=sheetNames[i],
+                        skip=0,
+                        col_names=FALSE)
+    # NA列を除去
+    tempdf<- tempdf[!is.na(tempdf[,1]),]
+    
+    # データ部分の開始行及び列を取得（最初のシートのみ）
+    if(i == 1){
+      skiprows<- grep("Ref",unlist(as.vector(tempdf[,1])))[1]
+      skipcols<- grep("銀行",tempdf[skiprows,])[2]
+    }
+    
+    # 余分な冒頭行を削除
+    tempdf<- tempdf[3:nrow(tempdf),]
+    
+    # 当該シードの銀行名を取得
+    bankNames<- tempdf[1,seq(from=skipcols,to=length(tempdf[1,]),by=6)] %>%
+      as.matrix()
+    df<- c("銀行名",bankNames) %>% t() %>%
+      as.data.frame(nrow=1,ncol=length(bankNames)+1)
+    
+    # ループでの保管用のダミー行
+    temprow<- data.frame(nrow=1)
+    
+    # シートの行数分のループ
+    for(j in 3:nrow(tempdf)){
+      # 項目名の取得
+      if(year<2014){
+        temprow[,1]<- str_remove_all(
+          paste0(tempdf[j,1],
+                 tempdf[j,2],
+                 tempdf[j,3],
+                 tempdf[j,4]),"NA")
+      }else{
+        temprow[,1]<- str_remove_all(
+          paste0(tempdf[j,1],
+                 tempdf[j,2],
+                 tempdf[j,3],
+                 tempdf[j,4],
+                 tempdf[j,5],
+                 tempdf[j,6]),"NA")
+      }
+      
+      # データの取得（銀行名が入っている列の一つ右）
+      temprow2<- tempdf[j,seq(from=skipcols+1,to=length(tempdf[j,]),by=6)] %>%
+        as.matrix()
+      temprow2<- as.numeric(temprow2)
+      
+      # 項目名とデータを統合
+      temprow[,2:(length(temprow2)+1)]<- temprow2
+      
+      # 銀行名を列名に
+      colnames(temprow)<- colnames(df)
+      
+      # 行を追加
+      df<- rbind(df,temprow)
+    }
+    
+    # 行列を転置、転置後の1列目＝銀行名を変数名に
+    df<- t(df)
+    colnames(df)<- df[1,]
+    df<- df[-1,] %>% as.data.frame()
+    
+    # ロング型に変換してまとめる
+    if(i == 1){
+      DataBase<- gather(df,key=勘定項目,value=金額,-銀行名)
+    }else{
+      tempData<- gather(df,key=勘定項目,value=金額,-銀行名)
+      DataBase<- rbind(DataBase,tempData)
+    }
+  }
+  
+  # 数字を数値型に、年度を付加
+  DataBase<- DataBase[!is.na(DataBase$金額),]
+  DataBase$金額<- as.numeric(DataBase$金額)
+  DataBase$年度<- year
+  
+  file.remove(exfile)
+  
+  # 出力
+  DataBase
+}
+
+# URLの取得
+html<- read_html("https://www.zenginkyo.or.jp/stats/year2-02/") %>%
+  html_elements("a") %>%
+  html_attr("href")
+link<- html[grep("terminal",html)]
+link<- paste0("https://www.zenginkyo.or.jp",link)
+
+# URLから年度を取得
+year<- str_remove_all(link,"https://www.zenginkyo.or.jp/stats/year2-02/account") %>%
+  str_remove_all("-terminal/") %>%
+  as.numeric()
+
+# ファイル形式の関係で2014年以降に限定
+year<- year[year>2013]
+link<- link[1:length(year)]
+
+# 対象年分のループ
+for(m in 1:length(year)){
+  # ターゲットとなる表（個別行のBS/PLがまとまったzip）のURLを取得
+  html<- read_html(link[m]) %>%
+    html_elements("a") %>%
+    html_attr("href")
+  url<- paste0("https://www.zenginkyo.or.jp",
+               html[grep("kobetsu",html)])
+
+  # 関数を利用してシートから読み込む
+  tempDataBase<- ReadSheet(url,year[m])
+  
+  # 読み込んだ結果をまとめる
+  if(m == 1){
+    DataBase<- tempDataBase
+  }else{
+    DataBase<- rbind(DataBase,tempDataBase)
+  }
+}
+
+write.csv(DataBase,"全銀決算DB.csv",fileEncoding = "SHIFT-JIS")
